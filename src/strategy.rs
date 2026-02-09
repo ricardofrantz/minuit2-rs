@@ -15,6 +15,7 @@ pub struct MnStrategy {
 }
 
 impl MnStrategy {
+    /// Create a new strategy with the given level (0=low, 1=medium, 2=high).
     pub fn new(level: u32) -> Self {
         let mut s = Self {
             strategy: level,
@@ -67,46 +68,57 @@ impl MnStrategy {
         self.hess_grad_ncycles = 6;
     }
 
+    /// Get the strategy level.
     pub fn strategy(&self) -> u32 {
         self.strategy
     }
 
+    /// Get the number of gradient calculation cycles.
     pub fn grad_ncycles(&self) -> u32 {
         self.grad_ncycles
     }
 
+    /// Get the gradient step tolerance.
     pub fn grad_step_tol(&self) -> f64 {
         self.grad_step_tol as f64 / 10.0
     }
 
+    /// Get the gradient tolerance.
     pub fn grad_tol(&self) -> f64 {
         self.grad_tol as f64 / 100.0
     }
 
+    /// Get the number of Hessian calculation cycles.
     pub fn hess_ncycles(&self) -> u32 {
         self.hess_ncycles
     }
 
+    /// Get the Hessian step tolerance.
     pub fn hess_step_tol(&self) -> f64 {
         self.hess_step_tol as f64 / 10.0
     }
 
+    /// Get the Hessian g2 tolerance.
     pub fn hess_g2_tol(&self) -> f64 {
         self.hess_g2_tol as f64 / 100.0
     }
 
+    /// Get the number of Hessian gradient calculation cycles.
     pub fn hess_grad_ncycles(&self) -> u32 {
         self.hess_grad_ncycles
     }
 
+    /// Check if this is a low strategy.
     pub fn is_low(&self) -> bool {
         self.strategy == 0
     }
 
+    /// Check if this is a medium strategy.
     pub fn is_medium(&self) -> bool {
         self.strategy == 1
     }
 
+    /// Check if this is a high strategy.
     pub fn is_high(&self) -> bool {
         self.strategy >= 2
     }

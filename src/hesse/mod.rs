@@ -23,6 +23,7 @@ pub struct MnHesse {
 }
 
 impl MnHesse {
+    /// Create a new Hesse error calculator with default settings.
     pub fn new() -> Self {
         Self {
             strategy: MnStrategy::default(),

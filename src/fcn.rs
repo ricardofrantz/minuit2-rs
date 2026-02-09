@@ -4,6 +4,7 @@
 /// that corresponds to one standard deviation (1.0 for chi-square, 0.5 for
 /// log-likelihood).
 pub trait FCN {
+    /// Evaluate the function at the given parameter values.
     fn value(&self, par: &[f64]) -> f64;
 
     /// FCN change corresponding to 1-sigma. Default = 1.0 (chi-square).
@@ -24,6 +25,7 @@ where
 
 /// FCN that also provides analytical gradients.
 pub trait FCNGradient: FCN {
+    /// Compute the gradient vector at the given parameter values.
     fn gradient(&self, par: &[f64]) -> Vec<f64>;
 }
 

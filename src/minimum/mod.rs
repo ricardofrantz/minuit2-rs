@@ -101,6 +101,7 @@ impl FunctionMinimum {
 
     // --- Accessors ---
 
+    /// Get the initial seed.
     pub fn seed(&self) -> &MinimumSeed {
         &self.seed
     }
@@ -109,10 +110,12 @@ impl FunctionMinimum {
         &self.states
     }
 
+    /// Get the final state.
     pub fn state(&self) -> &MinimumState {
         self.states.last().unwrap_or_else(|| self.seed.state())
     }
 
+    /// Get the user-facing state (external space).
     pub fn user_state(&self) -> &MnUserParameterState {
         &self.user_state
     }
@@ -142,10 +145,12 @@ impl FunctionMinimum {
         self.state().is_valid() && !self.is_above_max_edm && !self.reached_call_limit
     }
 
+    /// Check if the result is above the maximum EDM threshold.
     pub fn is_above_max_edm(&self) -> bool {
         self.is_above_max_edm
     }
 
+    /// Check if the function call limit was reached.
     pub fn reached_call_limit(&self) -> bool {
         self.reached_call_limit
     }

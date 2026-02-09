@@ -72,6 +72,7 @@ impl MinimumError {
         self.dcovar
     }
 
+    /// Get the status of the error matrix.
     pub fn status(&self) -> ErrorMatrixStatus {
         self.status
     }
@@ -92,6 +93,7 @@ impl MinimumError {
         !self.made_pos_def
     }
 
+    /// Check if the Hessian calculation failed.
     pub fn hesse_failed(&self) -> bool {
         self.hesse_failed
     }

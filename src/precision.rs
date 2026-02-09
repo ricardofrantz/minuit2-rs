@@ -9,6 +9,7 @@ pub struct MnMachinePrecision {
 }
 
 impl MnMachinePrecision {
+    /// Create a new precision object with default f64 epsilon.
     pub fn new() -> Self {
         let eps = f64::EPSILON;
         Self {

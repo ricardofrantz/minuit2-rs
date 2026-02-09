@@ -25,6 +25,7 @@ pub struct MnMinos<'a> {
 }
 
 impl<'a> MnMinos<'a> {
+    /// Create a new MINOS error calculator.
     pub fn new(fcn: &'a dyn FCN, minimum: &'a FunctionMinimum) -> Self {
         Self {
             fcn,

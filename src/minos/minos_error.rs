@@ -62,6 +62,7 @@ impl MinosError {
         &self.upper
     }
 
+    /// Check if both upper and lower errors are valid.
     pub fn is_valid(&self) -> bool {
         self.lower.is_valid() && self.upper.is_valid()
     }
@@ -74,10 +75,12 @@ impl MinosError {
         self.upper.is_valid()
     }
 
+    /// Check if the lower crossing is at a limit.
     pub fn at_lower_limit(&self) -> bool {
         self.lower.at_limit()
     }
 
+    /// Check if the upper crossing is at a limit.
     pub fn at_upper_limit(&self) -> bool {
         self.upper.at_limit()
     }

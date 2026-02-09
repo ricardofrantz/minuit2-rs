@@ -20,6 +20,7 @@ pub struct MnContours<'a> {
 }
 
 impl<'a> MnContours<'a> {
+    /// Create a new contour calculator.
     pub fn new(fcn: &'a dyn FCN, minimum: &'a FunctionMinimum) -> Self {
         Self {
             fcn,

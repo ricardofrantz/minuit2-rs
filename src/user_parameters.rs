@@ -16,6 +16,7 @@ pub struct MnUserParameters {
 }
 
 impl MnUserParameters {
+    /// Create an empty parameter collection.
     pub fn new() -> Self {
         Self {
             trafo: MnUserTransformation::new(Vec::new()),
@@ -23,6 +24,7 @@ impl MnUserParameters {
         }
     }
 
+    /// Get the internal transformation object.
     pub fn trafo(&self) -> &MnUserTransformation {
         &self.trafo
     }

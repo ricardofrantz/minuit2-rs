@@ -90,6 +90,7 @@ impl MnCross {
         }
     }
 
+    /// Get the crossing value (multiplier).
     pub fn value(&self) -> f64 {
         self.value
     }
@@ -102,10 +103,12 @@ impl MnCross {
         self.nfcn
     }
 
+    /// Check if the crossing was found successfully.
     pub fn is_valid(&self) -> bool {
         self.valid
     }
 
+    /// Check if the crossing is at a parameter limit.
     pub fn at_limit(&self) -> bool {
         self.is_at_limit
     }
@@ -114,6 +117,7 @@ impl MnCross {
         self.is_at_max_fcn
     }
 
+    /// Check if a new minimum was found during the search.
     pub fn new_minimum(&self) -> bool {
         self.new_minimum
     }

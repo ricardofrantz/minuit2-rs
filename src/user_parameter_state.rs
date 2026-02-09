@@ -43,6 +43,7 @@ impl MnUserParameterState {
         &mut self.params
     }
 
+    /// Get the function value.
     pub fn fval(&self) -> f64 {
         self.fval
     }
@@ -51,6 +52,7 @@ impl MnUserParameterState {
         self.fval = fval;
     }
 
+    /// Get the estimated distance to minimum.
     pub fn edm(&self) -> f64 {
         self.edm
     }
@@ -59,6 +61,7 @@ impl MnUserParameterState {
         self.edm = edm;
     }
 
+    /// Get the total number of function calls.
     pub fn nfcn(&self) -> usize {
         self.nfcn
     }
@@ -67,6 +70,7 @@ impl MnUserParameterState {
         self.nfcn = nfcn;
     }
 
+    /// Check if the minimization result is valid.
     pub fn is_valid(&self) -> bool {
         self.is_valid
     }
@@ -75,10 +79,12 @@ impl MnUserParameterState {
         self.is_valid = valid;
     }
 
+    /// Check if the covariance matrix is available.
     pub fn has_covariance(&self) -> bool {
         self.covariance_valid
     }
 
+    /// Get the covariance matrix if available.
     pub fn covariance(&self) -> Option<&MnUserCovariance> {
         self.covariance.as_ref()
     }
@@ -88,6 +94,7 @@ impl MnUserParameterState {
         self.covariance = Some(cov);
     }
 
+    /// Get the global correlation coefficients if available.
     pub fn global_cc(&self) -> Option<&[f64]> {
         self.global_cc.as_deref()
     }

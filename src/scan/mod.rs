@@ -106,6 +106,7 @@ pub struct MnScan<'a> {
 }
 
 impl<'a> MnScan<'a> {
+    /// Create a new high-level scan from a minimization result.
     pub fn new(fcn: &'a dyn FCN, minimum: &'a FunctionMinimum) -> Self {
         Self { fcn, minimum }
     }

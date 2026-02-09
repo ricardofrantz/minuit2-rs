@@ -23,6 +23,7 @@ impl MnUserCovariance {
         Self { data, nrow: n }
     }
 
+    /// Get the number of rows (parameters).
     pub fn nrow(&self) -> usize {
         self.nrow
     }
@@ -39,6 +40,7 @@ impl MnUserCovariance {
         self.data[r + c * (c + 1) / 2] = val;
     }
 
+    /// Get the raw upper-triangle data.
     pub fn data(&self) -> &[f64] {
         &self.data
     }

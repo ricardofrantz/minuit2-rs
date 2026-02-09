@@ -50,14 +50,17 @@ impl MinimumState {
         }
     }
 
+    /// Get the parameters at this state.
     pub fn parameters(&self) -> &MinimumParameters {
         &self.parameters
     }
 
+    /// Get the error matrix at this state.
     pub fn error(&self) -> &MinimumError {
         &self.error
     }
 
+    /// Get the gradient at this state.
     pub fn gradient(&self) -> &FunctionGradient {
         &self.gradient
     }

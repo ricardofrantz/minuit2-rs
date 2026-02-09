@@ -46,14 +46,17 @@ impl MnParabola {
         self.a * x * x + self.b * x + self.c
     }
 
+    /// Get the quadratic coefficient.
     pub fn a(&self) -> f64 {
         self.a
     }
 
+    /// Get the linear coefficient.
     pub fn b(&self) -> f64 {
         self.b
     }
 
+    /// Get the constant coefficient.
     pub fn c(&self) -> f64 {
         self.c
     }
