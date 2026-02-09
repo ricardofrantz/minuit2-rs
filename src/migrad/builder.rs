@@ -6,7 +6,8 @@
 
 use nalgebra::{DMatrix, DVector};
 
-use crate::gradient::Numerical2PGradientCalculator;
+use crate::fcn::FCNGradient;
+use crate::gradient::{AnalyticalGradientCalculator, Numerical2PGradientCalculator};
 use crate::linesearch::mn_linesearch;
 use crate::minimum::error::{ErrorMatrixStatus, MinimumError};
 use crate::minimum::gradient::FunctionGradient;
@@ -62,6 +63,52 @@ impl VariableMetricBuilder {
         );
 
         let states2 = Self::iterate(fcn, &seed2, strategy, maxfcn2, edmval);
+        if states2.is_empty() {
+            states
+        } else {
+            states2
+        }
+    }
+
+    /// Top-level Migrad minimization with analytical gradients.
+    pub fn minimum_with_gradient(
+        fcn: &MnFcn,
+        gradient_fcn: &dyn FCNGradient,
+        seed: &MinimumSeed,
+        _strategy: &MnStrategy,
+        maxfcn: usize,
+        edmval: f64,
+    ) -> Vec<MinimumState> {
+        // First pass: use full budget
+        let states = Self::iterate_with_gradient(fcn, gradient_fcn, seed, maxfcn, edmval);
+
+        if let Some(last) = states.last()
+            && last.edm() < edmval
+        {
+            return states;
+        }
+
+        // If first pass failed, try second pass with increased budget
+        let maxfcn2 = (maxfcn as f64 * 1.3) as usize;
+        let remaining = maxfcn2.saturating_sub(fcn.num_of_calls());
+        if remaining < 10 {
+            return states;
+        }
+
+        // Build a new seed from the last state
+        let last = states.last().unwrap_or_else(|| seed.state());
+        let seed2 = MinimumSeed::new(
+            MinimumState::new(
+                last.parameters().clone(),
+                last.error().clone(),
+                last.gradient().clone(),
+                last.edm(),
+                last.nfcn(),
+            ),
+            seed.trafo().clone(),
+        );
+
+        let states2 = Self::iterate_with_gradient(fcn, gradient_fcn, &seed2, maxfcn2, edmval);
         if states2.is_empty() {
             states
         } else {
@@ -159,6 +206,145 @@ impl VariableMetricBuilder {
                 &new_params,
                 seed.trafo(),
                 &gradient,
+            );
+
+            // 6. DFP update of V
+            let (v_updated, new_dcovar) = Self::dfp_update(
+                &current_error,
+                &new_params,
+                &params,
+                &new_gradient,
+                &gradient,
+            );
+
+            let mut new_error = MinimumError::new(v_updated, new_dcovar);
+            if current_error.status() == ErrorMatrixStatus::MadePositiveDefinite {
+                new_error.set_made_pos_def(true);
+            }
+
+            // 7. EDM = 0.5 * g^T * V * g, corrected by (1 + 3*dcovar)
+            let new_g = new_gradient.grad();
+            let new_v = new_error.matrix();
+            edm = 0.5 * new_g.dot(&(new_v * new_g));
+            edm *= 1.0 + 3.0 * new_dcovar;
+
+            // Save state
+            let state = MinimumState::new(
+                new_params.clone(),
+                new_error.clone(),
+                new_gradient.clone(),
+                edm,
+                fcn.num_of_calls(),
+            );
+            states.push(state);
+
+            // 8. Check convergence
+            if edm < edmval {
+                break;
+            }
+
+            // Check call limit
+            if fcn.num_of_calls() >= maxfcn {
+                break;
+            }
+
+            // Update for next iteration
+            params = new_params;
+            error = new_error;
+            gradient = new_gradient;
+        }
+
+        states
+    }
+
+    /// Core iteration loop with analytical gradients.
+    fn iterate_with_gradient(
+        fcn: &MnFcn,
+        gradient_fcn: &dyn FCNGradient,
+        seed: &MinimumSeed,
+        maxfcn: usize,
+        edmval: f64,
+    ) -> Vec<MinimumState> {
+        let n = seed.n_variable_params();
+        let prec = seed.precision();
+
+        // Current state
+        let mut params = seed.parameters().clone();
+        let mut error = seed.error().clone();
+        let mut gradient = seed.gradient().clone();
+        let mut edm = seed.edm();
+
+        let mut states = Vec::new();
+
+        loop {
+            // 1. Newton step: step = -V * grad
+            let v = error.matrix();
+            let g = gradient.grad();
+            let step = -(v * g);
+
+            // 2. Check positive-definiteness: gdel = step · grad
+            let mut gdel = step.dot(g);
+
+            let (current_step, current_error) = if gdel > 0.0 {
+                // step is not a descent direction — V is not pos.def.
+                // Force V positive-definite and recompute
+                let (v_fixed, _was_modified) = make_pos_def(v, prec);
+                let mut err_fixed = MinimumError::new(v_fixed.clone(), error.dcovar());
+                err_fixed.set_made_pos_def(true);
+                let step_fixed = -(&v_fixed * g);
+                gdel = step_fixed.dot(g);
+
+                // If still not a descent direction, use steepest descent
+                if gdel > 0.0 {
+                    // Fall back to steepest descent with unit matrix
+                    let step_sd = -g.clone();
+                    gdel = step_sd.dot(g);
+                    let err_sd = MinimumError::new(DMatrix::identity(n, n), 1.0);
+                    (step_sd, err_sd)
+                } else {
+                    (step_fixed, err_fixed)
+                }
+            } else {
+                (step, error.clone())
+            };
+
+            // 3. Line search: parabolic interpolation along step
+            let ls_result = mn_linesearch(fcn, &params, &current_step, gdel, prec);
+            let lambda = ls_result.x;
+            let f_new = ls_result.y;
+
+            // Check for no improvement
+            if (f_new - params.fval()).abs() <= params.fval().abs() * prec.eps() {
+                // No significant improvement — likely at machine precision limit
+                let new_params = MinimumParameters::with_step(
+                    params.vec() + lambda * &current_step,
+                    lambda * &current_step,
+                    f_new,
+                );
+                let state = MinimumState::new(
+                    new_params,
+                    current_error.clone(),
+                    gradient.clone(),
+                    edm,
+                    fcn.num_of_calls(),
+                );
+                states.push(state);
+                break;
+            }
+
+            // 4. Update parameters: p_new = p_old + λ * step
+            let p_new = params.vec() + lambda * &current_step;
+            let new_params = MinimumParameters::with_step(
+                p_new,
+                lambda * &current_step,
+                f_new,
+            );
+
+            // 5. Compute new gradient using analytical gradient calculator
+            let new_gradient = AnalyticalGradientCalculator::compute(
+                gradient_fcn,
+                seed.trafo(),
+                &new_params,
             );
 
             // 6. DFP update of V

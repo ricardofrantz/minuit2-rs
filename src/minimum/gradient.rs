@@ -67,4 +67,8 @@ impl FunctionGradient {
     pub fn set_valid(&mut self, valid: bool) {
         self.valid = valid;
     }
+
+    pub fn set_analytical(&mut self, analytical: bool) {
+        self.analytical = analytical;
+    }
 }

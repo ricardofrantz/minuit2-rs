@@ -8,7 +8,7 @@ pub mod builder;
 pub mod minimizer;
 pub mod seed;
 
-use crate::fcn::FCN;
+use crate::fcn::{FCN, FCNGradient};
 use crate::minimum::FunctionMinimum;
 use crate::mn_fcn::MnFcn;
 use crate::strategy::MnStrategy;
@@ -89,7 +89,7 @@ impl MnMigrad {
         self
     }
 
-    /// Run the minimization.
+    /// Run the minimization with numerical gradients (default).
     pub fn minimize(&self, fcn: &dyn FCN) -> FunctionMinimum {
         let n = self.params.variable_parameters();
         let max_fcn = self.max_fcn.unwrap_or(200 + 100 * n + 5 * n * n);
@@ -98,6 +98,24 @@ impl MnMigrad {
         let mn_fcn = MnFcn::new(fcn, &trafo);
         minimizer::VariableMetricMinimizer::minimize(
             &mn_fcn,
+            &trafo,
+            &self.strategy,
+            max_fcn,
+            self.tolerance,
+        )
+    }
+
+    /// Run the minimization with user-provided analytical gradients.
+    ///
+    /// Uses the analytical gradients provided by `FCNGradient::gradient()`.
+    /// This typically requires fewer function evaluations than numerical differentiation.
+    pub fn minimize_grad(&self, fcn: &dyn FCNGradient) -> FunctionMinimum {
+        let n = self.params.variable_parameters();
+        let max_fcn = self.max_fcn.unwrap_or(200 + 100 * n + 5 * n * n);
+        let trafo = self.params.trafo().clone();
+
+        minimizer::VariableMetricMinimizer::minimize_with_gradient(
+            fcn,
             &trafo,
             &self.strategy,
             max_fcn,
