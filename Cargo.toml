@@ -1,0 +1,12 @@
+[package]
+name = "minuit2"
+version = "0.1.0"
+edition = "2024"
+description = "Pure Rust port of CERN Minuit2 parameter optimization engine"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ricardofrantz/minuit2-rs"
+keywords = ["optimization", "minimization", "fitting", "physics"]
+categories = ["science", "mathematics"]
+
+[dependencies]
+nalgebra = "0.33"
