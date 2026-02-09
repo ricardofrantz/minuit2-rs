@@ -159,4 +159,9 @@ impl FunctionMinimum {
     pub fn n_variable_params(&self) -> usize {
         self.seed.n_variable_params()
     }
+
+    /// Replace the user state (used by Hesse to inject covariance info).
+    pub fn set_user_state(&mut self, state: MnUserParameterState) {
+        self.user_state = state;
+    }
 }
