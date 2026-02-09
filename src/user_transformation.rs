@@ -259,9 +259,10 @@ mod tests {
 
     #[test]
     fn unbounded_passthrough() {
-        let params = vec![MinuitParameter::new(0, "x", 3.14, 0.1)];
+        let pi = std::f64::consts::PI;
+        let params = vec![MinuitParameter::new(0, "x", pi, 0.1)];
         let t = MnUserTransformation::new(params);
-        assert!((t.ext2int(0, 3.14) - 3.14).abs() < 1e-15);
-        assert!((t.int2ext(0, 3.14) - 3.14).abs() < 1e-15);
+        assert!((t.ext2int(0, pi) - pi).abs() < 1e-15);
+        assert!((t.int2ext(0, pi) - pi).abs() < 1e-15);
     }
 }
