@@ -31,17 +31,23 @@
 //! ```
 
 pub mod application;
+pub mod contours;
+pub mod covariance_squeeze;
 pub mod fcn;
+pub mod global_cc;
 pub mod gradient;
+pub mod hesse;
 pub mod linesearch;
 pub mod migrad;
 pub mod minimum;
+pub mod minos;
 pub mod mn_fcn;
 pub mod parabola;
 pub mod parameter;
 pub mod posdef;
 pub mod precision;
 pub mod print;
+pub mod scan;
 pub mod simplex;
 pub mod strategy;
 pub mod transform;
@@ -51,11 +57,15 @@ pub mod user_parameters;
 pub mod user_transformation;
 
 // Re-exports for convenience
+pub use contours::MnContours;
 pub use fcn::{FCN, FCNGradient};
+pub use hesse::MnHesse;
 pub use migrad::MnMigrad;
 pub use minimum::FunctionMinimum;
+pub use minos::MnMinos;
 pub use parameter::MinuitParameter;
 pub use precision::MnMachinePrecision;
+pub use scan::MnScan;
 pub use simplex::MnSimplex;
 pub use strategy::MnStrategy;
 pub use user_covariance::MnUserCovariance;
