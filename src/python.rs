@@ -19,7 +19,9 @@ struct PythonFCN {
 impl FCN for PythonFCN {
     fn value(&self, par: &[f64]) -> f64 {
         Python::with_gil(|py| {
-            let args = PyTuple::new(py, par).unwrap();
+            let Ok(args) = PyTuple::new(py, par) else {
+                return f64::INFINITY;
+            };
             match self.fcn.call(py, &args, None) {
                 Ok(val) => val.extract::<f64>(py).unwrap_or(f64::INFINITY),
                 Err(e) => {

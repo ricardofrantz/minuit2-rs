@@ -89,7 +89,7 @@ pub fn mn_linesearch(
 
     // Sort so that pt0.x < pt1.x < pt2.x
     let mut pts = [pt0, pt1, pt2];
-    pts.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap());
+    pts.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
     pt0 = pts[0];
     pt1 = pts[1];
     pt2 = pts[2];
@@ -152,7 +152,7 @@ pub fn mn_linesearch(
 
         // Re-sort
         let mut pts = [pt0, pt1, pt2];
-        pts.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap());
+        pts.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
         pt0 = pts[0];
         pt1 = pts[1];
         pt2 = pts[2];

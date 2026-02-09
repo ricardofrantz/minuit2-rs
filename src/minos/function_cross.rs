@@ -199,7 +199,7 @@ pub fn find_crossing(
         (a_right, f_right),
         (a_cross, f_cross),
     ]);
-    pts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    pts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
     let maxitr = 15;
     for _itr in 0..maxitr {
@@ -208,7 +208,7 @@ pub fn find_crossing(
         }
 
         // Sort points by parameter value
-        pts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        pts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
         // Fit parabola through 3 points (function value vs parameter value)
         let p1 = MnParabolaPoint::new(pts[0].0, pts[0].1);
