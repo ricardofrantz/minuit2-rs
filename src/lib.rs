@@ -57,6 +57,9 @@ pub mod user_parameter_state;
 pub mod user_parameters;
 pub mod user_transformation;
 
+#[cfg(feature = "python")]
+pub mod python;
+
 // Re-exports for convenience
 pub use contours::MnContours;
 pub use fcn::{FCN, FCNGradient};
