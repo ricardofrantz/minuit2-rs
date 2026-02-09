@@ -19,7 +19,7 @@ Complete map of [GooFit/Minuit2](https://github.com/GooFit/Minuit2) files, categ
 |------|--------|-------|
 | [inc/Minuit2/FCNBase.h](https://raw.githubusercontent.com/GooFit/Minuit2/master/inc/Minuit2/FCNBase.h) | Port | → `trait FCN` |
 | [inc/Minuit2/FCNGradientBase.h](https://raw.githubusercontent.com/GooFit/Minuit2/master/inc/Minuit2/FCNGradientBase.h) | Port | → `trait FCNGradient: FCN` |
-| [inc/Minuit2/GenericFunction.h](https://raw.githubusercontent.com/GooFit/Minuit2/master/inc/Minuit2/GenericFunction.h) | Port | Base function type |
+| [inc/Minuit2/GenericFunction.h](https://raw.githubusercontent.com/GooFit/Minuit2/master/inc/Minuit2/GenericFunction.h) | Skip | Rust traits replace C++ base class |
 | [inc/Minuit2/FCNAdapter.h](https://raw.githubusercontent.com/GooFit/Minuit2/master/inc/Minuit2/FCNAdapter.h) | Skip | ROOT Math adapter |
 | [inc/Minuit2/FCNGradAdapter.h](https://raw.githubusercontent.com/GooFit/Minuit2/master/inc/Minuit2/FCNGradAdapter.h) | Skip | ROOT Math adapter |
 

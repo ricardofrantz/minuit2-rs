@@ -49,25 +49,25 @@ The main workhorse. Most complex phase. This is the core value of the crate.
 
 ```
 1. Compute initial gradient g₀ by finite differences
-2. Build initial inverse Hessian H₀ (diagonal from gradient steps)
+2. Build initial approximate inverse Hessian V₀ (diagonal from gradient steps)
 3. Loop:
-   a. direction = -H * g
+   a. direction = -V * g
    b. step = line_search(direction)    ← parabolic interpolation
    c. x_new = x + step * direction
    d. g_new = numerical_gradient(x_new)
-   e. H_new = DFP_update(H, g_new - g, step * direction)
-   f. EDM = g_new^T * H_new * g_new
+   e. V_new = DFP_update(V, g_new - g, step * direction)
+   f. EDM = 0.5 * g_new^T * V_new * g_new
    g. if EDM < tolerance → converged
    h. if iterations > max → abort
-   i. if H not positive-definite → force posdef, retry
-4. Return minimum + covariance (H = approx inverse Hessian)
+   i. if V not positive-definite → force posdef, retry
+4. Return minimum + covariance (V ≈ inverse Hessian at minimum)
 ```
 
 ## Critical Numerical Details
 
-- **EDM** = `g^T * H^{-1} * g` — primary convergence criterion
-- **DFP update**: `H' = H + (dx * dx^T) / (dx^T * dg) - (H * dg * dg^T * H) / (dg^T * H * dg)`
-- **Positive-definiteness**: if eigenvalues of H go negative after update, reset H to diagonal
+- **EDM** = `0.5 * g^T * V * g` where `V` is the approximate inverse Hessian (covariance matrix). The factor 0.5 matches Minuit2's convention. Note: `VariableMetricBuilder` stores `V` directly (not the Hessian), so EDM uses `V` — not `V^{-1}`.
+- **DFP update** (updates `V`, the inverse Hessian): `V' = V + (dx * dx^T) / (dx^T * dg) - (V * dg * dg^T * V) / (dg^T * V * dg)`
+- **Positive-definiteness**: if eigenvalues of V go negative after update, reset V to diagonal
 - **Gradient step size**: Strategy 0 = forward diff, Strategy 2 = central diff (2x FCN evals)
 - **Line search**: NOT Wolfe conditions — Minuit uses parabolic interpolation on 3 points
 
