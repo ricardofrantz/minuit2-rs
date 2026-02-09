@@ -1,6 +1,6 @@
 # minuit2 Documentation
 
-Pure Rust port of CERN Minuit2 — the standard parameter optimization engine for high-energy physics. This document covers all public types, algorithms, and usage patterns through v0.2.0.
+Pure Rust port of CERN Minuit2 — the standard parameter optimization engine for high-energy physics. This document covers all public types, algorithms, and usage patterns through v0.3.0.
 
 ## Table of Contents
 
@@ -8,6 +8,11 @@ Pure Rust port of CERN Minuit2 — the standard parameter optimization engine fo
 - [Minimizers](#minimizers)
   - [MnMigrad (recommended)](#mnmigrad)
   - [MnSimplex (derivative-free)](#mnsimplex)
+- [Error Analysis](#error-analysis)
+  - [MnHesse (Accurate Errors)](#mnhesse)
+  - [MnMinos (Asymmetric Errors)](#mnminos)
+  - [MnScan (Parameter Scans)](#mnscan)
+  - [MnContours (2D Contours)](#mncontours)
 - [Defining a Function (FCN)](#defining-a-function-fcn)
 - [Parameters](#parameters)
   - [Free Parameters](#free-parameters)
@@ -44,7 +49,7 @@ Add to `Cargo.toml`:
 
 ```toml
 [dependencies]
-minuit2 = "0.2"
+minuit2 = "0.3"
 ```
 
 Minimize the Rosenbrock function:
@@ -110,6 +115,137 @@ let result = MnSimplex::new()
 **When to use:** Noisy or non-smooth functions, or as a pre-conditioning step before Migrad.
 
 **Note:** Minuit's simplex is NOT textbook Nelder-Mead. It uses rho-extrapolation from the original Fortran MINUIT and has no shrink step.
+
+---
+
+## Error Analysis
+
+After minimization, use these tools for accurate parameter uncertainties, correlations, and confidence regions.
+
+### MnHesse
+
+**Full Hessian calculation.** Migrad produces an approximate covariance matrix via the DFP update. `MnHesse` computes the exact Hessian using finite differences and inverts it for accurate parameter errors and correlations.
+
+```rust
+use minuit2::{MnMigrad, MnHesse};
+
+let fcn = |p: &[f64]| 2.0 * p[0] * p[0] + 8.0 * p[1] * p[1];
+
+let result = MnMigrad::new()
+    .add("x", 5.0, 1.0)
+    .add("y", -3.0, 1.0)
+    .minimize(&fcn);
+
+// Returns a FunctionMinimum with accurate covariance
+let hesse_result = MnHesse::new()
+    .with_strategy(1)
+    .calculate(&fcn, &result);
+
+let state = hesse_result.user_state();
+println!("covariance: {}", state.has_covariance());
+println!("x = {} +/- {}", state.value("x").unwrap(), state.error("x").unwrap());
+
+// Or compute just the user state (no FunctionMinimum modification)
+let user_state = MnHesse::new().calculate_errors(&fcn, &result);
+```
+
+**What it computes:**
+1. Diagonal Hessian elements via 5-point finite differences with adaptive step sizing
+2. Gradient refinement (strategy > 0) using Hessian diagonal info
+3. Off-diagonal cross-derivatives
+4. Positive-definite enforcement via `make_pos_def`
+5. Inversion to covariance matrix
+6. Global correlation coefficients
+
+**When to use:**
+- Always, after Migrad, if you need precise errors or correlations
+- Before Minos (Minos requires a good covariance estimate)
+- To compute global correlation coefficients
+
+**Strategy effects:** Higher strategy = more gradient refinement cycles.
+
+### MnMinos
+
+**Asymmetric profile-likelihood errors.** Finds where `F(x) = Fmin + Up` by fixing each parameter and re-minimizing the rest. Handles non-Gaussian likelihoods and near-boundary parameters correctly.
+
+```rust
+use minuit2::MnMinos;
+
+let minos = MnMinos::new(&fcn, &hesse_result);
+
+// Get both errors at once
+let (lower, upper) = minos.errors(0);
+
+// Or get detailed result
+let me = minos.minos_error(0);
+if me.is_valid() {
+    println!("x = {:.4} {:.4} / +{:.4}",
+        hesse_result.params()[0], me.lower_error(), me.upper_error());
+}
+
+// Single-sided crossing
+let lower_cross = minos.lower(0);   // MnCross
+let upper_cross = minos.upper(0);   // MnCross
+```
+
+**MinosError API:**
+
+| Method | Returns |
+|--------|---------|
+| `lower_error()` | Negative error (or -hesse_error if invalid) |
+| `upper_error()` | Positive error (or hesse_error if invalid) |
+| `is_valid()` | Both crossings succeeded |
+| `lower_valid()` / `upper_valid()` | Individual crossing status |
+| `at_lower_limit()` / `at_upper_limit()` | Parameter hit boundary |
+
+**When to use:**
+- Non-linear or non-parabolic likelihoods
+- Parameters near boundaries
+- Asymmetric confidence intervals for physics measurements
+
+### MnScan
+
+**1D Parameter Scan.** Evaluates the function along one parameter while keeping others at their minimum values.
+
+```rust
+use minuit2::MnScan;
+
+let scan = MnScan::new(&fcn, &hesse_result);
+
+// Auto-range: value +/- 2*error (pass 0.0, 0.0)
+let points = scan.scan(0, 40, 0.0, 0.0);
+
+// Or explicit range
+let points = scan.scan(0, 20, -2.0, 3.0);
+
+for (val, fval) in &points {
+    println!("{:10.6} {:12.6}", val, fval);
+}
+```
+
+**Auto-range:** When `low == high == 0.0`, scans `[value - 2*error, value + 2*error]`, clamped to parameter bounds. Maximum 101 steps.
+
+### MnContours
+
+**2D Confidence Contours.** Traces the contour `F(p) = Fmin + Up` in the plane of two parameters.
+
+```rust
+use minuit2::MnContours;
+
+let contours = MnContours::new(&fcn, &hesse_result);
+
+// 20 points on the 1-sigma contour between params 0 and 1
+let points = contours.points(0, 1, 20);
+for (x, y) in &points {
+    println!("{:10.6} {:10.6}", x, y);
+}
+
+// Full result with MINOS errors on both axes
+let result = contours.contour(0, 1, 20);
+// result.points, result.x_minos, result.y_minos
+```
+
+**Algorithm:** Finds 4 cardinal MINOS points, then bisects the largest gaps until reaching the requested count.
 
 ---
 
@@ -441,6 +577,8 @@ src/
 ├── parabola.rs            # MnParabola + MnParabolaPoint (quadratic fit)
 ├── linesearch.rs          # mn_linesearch (parabolic line search)
 ├── posdef.rs              # make_pos_def (eigenvalue shift)
+├── global_cc.rs           # global_correlation_coefficients
+├── covariance_squeeze.rs  # squeeze_matrix, squeeze_user_covariance, squeeze_error
 │
 ├── minimum/               # Result data structures
 │   ├── mod.rs             #   FunctionMinimum (top-level result)
@@ -454,6 +592,24 @@ src/
 │   ├── mod.rs             #   GradientCalculator trait
 │   ├── initial.rs         #   InitialGradientCalculator (heuristic from step sizes)
 │   └── numerical.rs       #   Numerical2PGradientCalculator (2-point central diff)
+│
+├── hesse/                 # Hessian error analysis
+│   ├── mod.rs             #   MnHesse (public API)
+│   ├── calculator.rs      #   Hesse computation (diagonal + off-diagonal)
+│   └── gradient.rs        #   HessianGradientCalculator (refined gradient)
+│
+├── minos/                 # MINOS asymmetric errors
+│   ├── mod.rs             #   MnMinos (public API)
+│   ├── cross.rs           #   MnCross (crossing result)
+│   ├── function_cross.rs  #   Crossing finder algorithm
+│   └── minos_error.rs     #   MinosError (lower/upper paired errors)
+│
+├── scan/                  # Parameter scanning
+│   └── mod.rs             #   MnScan / MnParameterScan
+│
+├── contours/              # 2D confidence contours
+│   ├── mod.rs             #   MnContours (public API)
+│   └── contours_error.rs  #   ContoursError (result type)
 │
 ├── simplex/               # Nelder-Mead simplex minimizer
 │   ├── mod.rs             #   MnSimplex (public builder API)
@@ -528,6 +684,16 @@ The `MnFcn` wrapper accepts internal parameters, transforms them to external, an
 | Simplex rhomin | 4.0 | simplex/builder.rs | Rho extrapolation minimum |
 | Simplex rhomax | 8.0 | simplex/builder.rs | Rho extrapolation maximum |
 | Default max FCN | 200+100n+5n² | application.rs | Call limit formula |
+| Hesse dmin | 8*eps2*(|x|+eps2) | hesse/calculator.rs | Min step size for Hessian diagonal |
+| Hesse aimsag | sqrt(eps2)*(f+up) | hesse/calculator.rs | Target sagitta for adaptive step |
+| Hesse maxcalls | 200+100n+5n² | hesse/mod.rs | Default call limit |
+| Minos tolerance | 0.1 | minos/mod.rs | Default crossing convergence tol |
+| Minos maxcalls | 2*(n+1)*(200+100n+5n²) | minos/mod.rs | Profile search call limit |
+| Cross maxitr | 15 | minos/function_cross.rs | Parabolic iterations |
+| Cross tlf | tol * up | minos/function_cross.rs | Function value tolerance |
+| Cross tla | tol | minos/function_cross.rs | Parameter tolerance |
+| Scan max steps | clamped to [2, 101] | scan/mod.rs | Number of scan points |
+| Contours min points | 4 | contours/mod.rs | Cardinal MINOS points |
 
 ---
 
@@ -566,10 +732,14 @@ EDM (Estimated Distance to Minimum) measures how far the current point is from t
 
 ## Test Suite
 
-58 tests total:
-- **42 unit tests**: parameter handling, transforms, precision, gradient, parabola, line search, positive-definite correction, strategy
+76 tests total:
+- **48 unit tests**: parameter handling, transforms, precision, gradient, parabola, line search, positive-definite correction, strategy, global correlation coefficients, covariance squeeze
 - **8 Migrad integration tests**: Rosenbrock 2D, quadratic bowl, 5D quadratic, bounded params, fixed params, Gaussian fit, Migrad vs Simplex comparison, display output
 - **6 Simplex integration tests**: Rosenbrock, quadratic, Gaussian, bounded, fixed, display
+- **4 Hesse integration tests**: quadratic errors, Rosenbrock, global correlations, calculate_errors
+- **3 Minos integration tests**: symmetric quadratic, asymmetric, fixed parameter
+- **3 Scan integration tests**: quadratic profile, auto-range, minimum tracking
+- **2 Contours integration tests**: quadratic ellipse, correlated
 - **2 doctests**: lib.rs quick start examples
 
 Run all tests:

@@ -17,6 +17,32 @@ let result = MnMigrad::new()
 println!("{result}");
 ```
 
+### Error Analysis
+
+After minimization, compute accurate parameter errors with Hesse and Minos:
+
+```rust
+use minuit2::{MnMigrad, MnHesse, MnMinos};
+
+let fcn = |p: &[f64]| 2.0 * p[0] * p[0] + 8.0 * p[1] * p[1];
+
+let result = MnMigrad::new()
+    .add("x", 5.0, 1.0)
+    .add("y", -3.0, 1.0)
+    .minimize(&fcn);
+
+let hesse_result = MnHesse::new().calculate(&fcn, &result);
+
+let minos = MnMinos::new(&fcn, &hesse_result);
+let x_error = minos.minos_error(0);
+println!(
+    "x = {} +{:.4} {:.4}",
+    hesse_result.params()[0],
+    x_error.upper_error(),
+    x_error.lower_error()
+);
+```
+
 See [DOC.md](DOC.md) for full documentation.
 
 ## Why
@@ -31,9 +57,10 @@ See [DOC.md](DOC.md) for full documentation.
 |-----------|--------|-------------|
 | **MnMigrad** | Done | Quasi-Newton (DFP) — recommended for smooth functions |
 | **MnSimplex** | Done | Nelder-Mead (Minuit variant) — derivative-free |
-| MnHesse | Planned | Full Hessian calculation for accurate errors |
-| MnMinos | Planned | Asymmetric error estimation |
-| MnContours | Planned | 2D confidence contours |
+| **MnHesse** | Done | Full Hessian calculation for accurate errors |
+| **MnMinos** | Done | Asymmetric error estimation |
+| **MnScan** | Done | 1D parameter scans with minimum tracking |
+| **MnContours** | Done | 2D confidence contours |
 
 ## Upstream Source
 
@@ -48,8 +75,8 @@ Of these, **~50 files are core** (the rest are ROOT adapters, Fumili, MPI, BLAS-
 | 1 | Core types, traits, parameters, linalg | Done | [plan_phase1.md](plan_phase1.md) |
 | 2 | Simplex minimizer | Done | [plan_phase2.md](plan_phase2.md) |
 | 3 | Migrad (variable metric) | Done | [plan_phase3.md](plan_phase3.md) |
-| 4 | Hesse, Minos, Scan, Contours | Next | [plan_phase4.md](plan_phase4.md) |
-| 5 | CLI, benchmarks, crates.io | Planned | [plan_phase5.md](plan_phase5.md) |
+| 4 | Hesse, Minos, Scan, Contours | Done | [plan_phase4.md](plan_phase4.md) |
+| 5 | CLI, benchmarks, crates.io | Next | [plan_phase5.md](plan_phase5.md) |
 
 ## Goals
 
@@ -61,6 +88,17 @@ Of these, **~50 files are core** (the rest are ROOT adapters, Fumili, MPI, BLAS-
 - Stretch: PyO3 Python bindings
 
 ## Changelog
+
+### v0.3.0 — Error Analysis Tools
+
+**New tools:**
+- `MnHesse` — Full Hessian computation for accurate parameter errors and covariance
+- `MnMinos` — Profile-likelihood asymmetric confidence intervals
+- `MnScan` — 1D parameter scans with minimum tracking
+- `MnContours` — 2D confidence contour computation
+- Global correlation coefficients and covariance squeeze utilities
+
+**Tests:** 76 total (48 unit + 8 Migrad + 6 Simplex + 4 Hesse + 3 Minos + 3 Scan + 2 Contours + 2 doctests)
 
 ### v0.2.0 — Migrad (Variable-Metric Minimizer)
 
