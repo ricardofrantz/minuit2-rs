@@ -2,6 +2,15 @@
 
 Minuit2 is CERN's parameter optimization engine, the standard in high-energy physics since 1975. This project ports the [standalone extraction](https://github.com/GooFit/Minuit2) to Rust — no C++, no ROOT.
 
+## Features
+
+- **Pure Rust.** No C++ toolchain, no unsafe blocks, zero-cost abstractions.
+- **Robust Algorithms.** Migrad (Variable Metric), Simplex (Nelder-Mead), Hesse (Exact Errors), Minos (Asymmetric Errors).
+- **Analytical Gradients.** Support for user-provided gradients for faster convergence.
+- **Python Bindings.** High-performance PyO3 bindings for integration with Python workflows.
+- **Parallel Processing.** Optional `rayon` support for parallel parameter scans.
+- **Numerical Stability.** Resilience against `NaN` and `Infinity` with automatic recovery.
+
 ## Quick Start
 
 ```rust
@@ -17,39 +26,36 @@ let result = MnMigrad::new()
 println!("{result}");
 ```
 
-### Error Analysis
+### Analytical Gradients
 
-After minimization, compute accurate parameter errors with Hesse and Minos:
+Use analytical gradients to significantly reduce the number of function calls:
 
 ```rust
-use minuit2::{MnMigrad, MnHesse, MnMinos};
+use minuit2::{FCN, FCNGradient, MnMigrad};
 
-let fcn = |p: &[f64]| 2.0 * p[0] * p[0] + 8.0 * p[1] * p[1];
+struct MyFcn;
+impl FCN for MyFcn {
+    fn value(&self, p: &[f64]) -> f64 { p[0]*p[0] + p[1]*p[1] }
+}
+impl FCNGradient for MyFcn {
+    fn gradient(&self, p: &[f64]) -> Vec<f64> { vec![2.0*p[0], 2.0*p[1]] }
+}
 
 let result = MnMigrad::new()
-    .add("x", 5.0, 1.0)
-    .add("y", -3.0, 1.0)
-    .minimize(&fcn);
-
-let hesse_result = MnHesse::new().calculate(&fcn, &result);
-
-let minos = MnMinos::new(&fcn, &hesse_result);
-let x_error = minos.minos_error(0);
-println!(
-    "x = {} +{:.4} {:.4}",
-    hesse_result.params()[0],
-    x_error.upper_error(),
-    x_error.lower_error()
-);
+    .add("x", 1.0, 0.1)
+    .add("y", 1.0, 0.1)
+    .minimize_grad(&MyFcn);
 ```
 
-See [DOC.md](DOC.md) for full documentation.
+### Feature Flags
 
-## Why
+- `python`: Enables PyO3 bindings (`Minuit` class).
+- `parallel`: Enables `rayon` support for parallel `MnScan`.
 
-- **No Rust equivalent.** `argmin`/`ganesh` lack Minuit-specific features: Hesse error matrices, Minos asymmetric errors, contours, chi-square error propagation.
-- **High impact.** HEP/experimental physics needs chi-square fits without ROOT bloat.
-- **Safety + speed.** No C++ build headaches, no memory bugs, easy parallelism.
+```toml
+[dependencies]
+minuit2 = { version = "0.3", features = ["python", "parallel"] }
+```
 
 ## Current Status
 
@@ -59,80 +65,21 @@ See [DOC.md](DOC.md) for full documentation.
 | **MnSimplex** | Done | Nelder-Mead (Minuit variant) — derivative-free |
 | **MnHesse** | Done | Full Hessian calculation for accurate errors |
 | **MnMinos** | Done | Asymmetric error estimation |
-| **MnScan** | Done | 1D parameter scans with minimum tracking |
+| **MnScan** | Done | 1D parameter scans (Parallel support available) |
 | **MnContours** | Done | 2D confidence contours |
+
+## Robustness & Security
+
+`minuit2-rs` is built for reliability in scientific computing:
+- **Zero Unsafe.** The entire codebase is written in 100% safe Rust.
+- **Numerical Resilience.** Gracefully handles `NaN` and `Inf` by treating them as high-value penalties, preventing optimizer crashes.
+- **Stress Tested.** Validated against 50-parameter problems and rugged landscapes like the **Goldstein-Price** function.
 
 ## Upstream Source
 
-[GooFit/Minuit2](https://github.com/GooFit/Minuit2) — ~14.5k LOC, 187 C++ files (76 `.cxx` + 111 `.h`), standalone CMake build.
+[GooFit/Minuit2](https://github.com/GooFit/Minuit2) — ~14.5k LOC, 187 C++ files.
+This port replaces custom C++ linear algebra with `nalgebra` and manual memory management with Rust's ownership model.
 
-Of these, **~50 files are core** (the rest are ROOT adapters, Fumili, MPI, BLAS-like routines replaceable by `nalgebra`). See [INVENTORY.md](INVENTORY.md) for the full file map.
+## License
 
-## Roadmap
-
-| Phase | Scope | Status | Plan |
-|-------|-------|--------|------|
-| 1 | Core types, traits, parameters, linalg | Done | [plan_phase1.md](plan_phase1.md) |
-| 2 | Simplex minimizer | Done | [plan_phase2.md](plan_phase2.md) |
-| 3 | Migrad (variable metric) | Done | [plan_phase3.md](plan_phase3.md) |
-| 4 | Hesse, Minos, Scan, Contours | Done | [plan_phase4.md](plan_phase4.md) |
-| 5 | CLI, benchmarks, crates.io | Next | [plan_phase5.md](plan_phase5.md) |
-
-## Goals
-
-- Crate on crates.io: `minuit2-rs`
-- Idiomatic Rust API (traits + builders)
-- Algorithms: Migrad, Simplex, Hesse, Minos, Scan/Contours
-- `nalgebra` for linalg, optional `rayon` for parallel scans
-- Validated against iminuit on physics benchmarks
-- Stretch: PyO3 Python bindings
-
-## Changelog
-
-### v0.3.0 — Error Analysis Tools
-
-**New tools:**
-- `MnHesse` — Full Hessian computation for accurate parameter errors and covariance
-- `MnMinos` — Profile-likelihood asymmetric confidence intervals
-- `MnScan` — 1D parameter scans with minimum tracking
-- `MnContours` — 2D confidence contour computation
-- Global correlation coefficients and covariance squeeze utilities
-
-**Tests:** 76 total (48 unit + 8 Migrad + 6 Simplex + 4 Hesse + 3 Minos + 3 Scan + 2 Contours + 2 doctests)
-
-### v0.2.0 — Migrad (Variable-Metric Minimizer)
-
-**New minimizer: `MnMigrad`** — quasi-Newton minimizer with DFP/BFGS inverse Hessian update. The workhorse algorithm for smooth function minimization. Converges quadratically near the minimum and produces an approximate covariance matrix.
-
-**New files:**
-- `src/parabola.rs` — Quadratic interpolation (`MnParabola`, `MnParabolaPoint`)
-- `src/linesearch.rs` — Parabolic line search (`mn_linesearch`)
-- `src/posdef.rs` — Positive-definite matrix correction (`make_pos_def`)
-- `src/gradient/numerical.rs` — Two-point central difference gradient (`Numerical2PGradientCalculator`)
-- `src/migrad/` — Full Migrad implementation:
-  - `seed.rs` — Seed generator (FCN eval + numerical gradient + initial V₀)
-  - `builder.rs` — Variable-metric iteration loop + DFP rank-2 update
-  - `minimizer.rs` — Orchestrator (seed → builder → FunctionMinimum)
-  - `mod.rs` — Public `MnMigrad` builder API
-
-**Tests:** 58 total (42 unit + 8 Migrad integration + 6 Simplex integration + 2 doctests)
-
-**API:** Same builder pattern as MnSimplex — drop-in replacement:
-```rust
-// Before (Simplex)
-MnSimplex::new().add("x", 0.0, 0.1).minimize(&fcn)
-// After (Migrad)
-MnMigrad::new().add("x", 0.0, 0.1).minimize(&fcn)
-```
-
-### v0.1.0 — Core Types + Simplex
-
-Initial release with core parameter types, transforms, and the Nelder-Mead simplex minimizer.
-
-- `FCN` trait with blanket impl for closures
-- Parameter management: free, bounded, fixed, constant
-- Sin/sqrt parameter transforms for bounded optimization
-- `MnSimplex` minimizer (Minuit variant of Nelder-Mead)
-- `FunctionMinimum` result type with Display impl
-- `MnStrategy` (low/medium/high optimization presets)
-- `nalgebra` for all linear algebra (replaces 28 C++ files)
+MIT OR Apache-2.0
