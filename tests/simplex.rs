@@ -136,7 +136,7 @@ fn bounded_parameters() {
         (x - 3.0).abs() < 0.1,
         "x should be near 3.0, got {x}"
     );
-    assert!(x >= 0.0 && x <= 5.0, "x should be within bounds");
+    assert!((0.0..=5.0).contains(&x), "x should be within bounds");
 }
 
 /// Test with a fixed parameter.
