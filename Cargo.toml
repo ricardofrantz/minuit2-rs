@@ -11,7 +11,7 @@ categories = ["science", "mathematics"]
 [dependencies]
 nalgebra = "0.33"
 rayon = { version = "1.10", optional = true }
-pyo3 = { version = "0.21", optional = true, features = ["extension-module"] }
+pyo3 = { version = "0.23", optional = true, features = ["extension-module"] }
 
 [dev-dependencies]
 criterion = "0.5"
