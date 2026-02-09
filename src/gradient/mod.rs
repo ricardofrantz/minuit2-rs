@@ -2,10 +2,13 @@
 //!
 //! The `GradientCalculator` trait defines the interface. Concrete impls:
 //! - `InitialGradientCalculator`: computes a first gradient estimate from step sizes
+//! - `Numerical2PGradientCalculator`: two-point central differences
 
 pub mod initial;
+pub mod numerical;
 
 pub use initial::InitialGradientCalculator;
+pub use numerical::Numerical2PGradientCalculator;
 
 use crate::minimum::gradient::FunctionGradient;
 use crate::minimum::parameters::MinimumParameters;
