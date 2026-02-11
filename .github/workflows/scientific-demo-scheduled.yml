@@ -112,8 +112,8 @@ jobs:
             examples/output/comparison_samples.csv
             examples/output/comparison_environment.json
 
-      - name: Commit refreshed artifacts (main only)
-        if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Commit refreshed artifacts (master only)
+        if: ${{ github.ref == 'refs/heads/master' }}
         shell: bash
         run: |
           if git diff --quiet -- \
