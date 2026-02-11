@@ -452,7 +452,7 @@ let result = MnMigrad::new()
 let hesse = MnHesse::new().calculate(&fcn, &result);
 let state = hesse.user_state();
 
-let ndf = data_len as f64 - 3.0;
+let ndf = fcn.x.len() as f64 - 3.0;
 println!("chi2/ndf = {:.2}/{:.0} = {:.2}", hesse.fval(), ndf, hesse.fval() / ndf);
 
 // Scan c2 to visualize the chi-square profile
@@ -499,11 +499,12 @@ let hesse = MnHesse::new().calculate(&fcn, &result);
 
 // Minos for asymmetric errors on each parameter
 let minos = MnMinos::new(&fcn, &hesse);
-for i in 0..3 {
+let names = ["A", "mu", "sigma"];
+for (i, name) in names.iter().enumerate() {
     let me = minos.minos_error(i);
     if me.is_valid() {
-        println!("param {} = {:.4}  {:.4} / +{:.4}",
-            i, hesse.user_state().params().value(i),
+        println!("{} = {:.4}  {:.4} / +{:.4}",
+            name, hesse.user_state().value(name).unwrap(),
             me.lower_error(), me.upper_error());
     }
 }
