@@ -166,10 +166,10 @@ fn read_masses_from_column(path: &str, column_name: &str) -> Result<Vec<f64>, St
         if col_idx >= cols.len() {
             continue;
         }
-        if let Ok(v) = cols[col_idx].trim().parse::<f64>() {
-            if v.is_finite() {
-                masses.push(v);
-            }
+        if let Ok(v) = cols[col_idx].trim().parse::<f64>()
+            && v.is_finite()
+        {
+            masses.push(v);
         }
     }
     Ok(masses)

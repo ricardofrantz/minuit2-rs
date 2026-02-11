@@ -181,14 +181,14 @@ fn parse_nist_dat(path: &Path, expected_params: usize) -> Result<NistDataset, St
             }
         }
 
-        if let Some((lhs, rhs)) = s.split_once('=') {
-            if lhs.trim_start().starts_with('b') {
-                let nums = parse_floats(rhs);
-                if nums.len() >= 4 {
-                    start1.push(nums[0]);
-                    start2.push(nums[1]);
-                    certified.push(nums[2]);
-                }
+        if let Some((lhs, rhs)) = s.split_once('=')
+            && lhs.trim_start().starts_with('b')
+        {
+            let nums = parse_floats(rhs);
+            if nums.len() >= 4 {
+                start1.push(nums[0]);
+                start2.push(nums[1]);
+                certified.push(nums[2]);
             }
         }
 

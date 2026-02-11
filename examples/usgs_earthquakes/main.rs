@@ -132,10 +132,10 @@ fn parse_magnitudes(path: &str) -> Result<Vec<f64>, String> {
         if cols.len() < 5 {
             continue;
         }
-        if let Ok(m) = cols[4].trim().parse::<f64>() {
-            if m.is_finite() {
-                mags.push(m);
-            }
+        if let Ok(m) = cols[4].trim().parse::<f64>()
+            && m.is_finite()
+        {
+            mags.push(m);
         }
     }
 

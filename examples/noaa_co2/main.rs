@@ -130,7 +130,9 @@ impl FCN for NoaaCo2Chi2 {
     }
 }
 
-fn parse_noaa_csv(path: &str) -> Result<(Vec<f64>, Vec<f64>, Vec<f64>), String> {
+type NoaaSeries = (Vec<f64>, Vec<f64>, Vec<f64>);
+
+fn parse_noaa_csv(path: &str) -> Result<NoaaSeries, String> {
     let f = File::open(path).map_err(|e| format!("failed to open {path}: {e}"))?;
     let reader = BufReader::new(f);
 
