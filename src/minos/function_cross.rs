@@ -5,8 +5,8 @@
 //! fixed and using parabolic interpolation to converge on the crossing.
 
 use crate::fcn::FCN;
-use crate::minimum::FunctionMinimum;
 use crate::migrad::MnMigrad;
+use crate::minimum::FunctionMinimum;
 use crate::parabola::{MnParabolaPoint, from_3_points};
 use crate::strategy::MnStrategy;
 
@@ -49,8 +49,8 @@ pub fn find_crossing(
     let npar = minimum.user_state().len();
 
     // Tolerances
-    let tlf = tlr * up;    // function tolerance
-    let tla = tlr;         // parameter tolerance
+    let tlf = tlr * up; // function tolerance
+    let tla = tlr; // parameter tolerance
 
     // --- Phase 1: Check limits ---
     let p = minimum.user_state().parameter(par);
@@ -185,7 +185,11 @@ pub fn find_crossing(
     // Check convergence
     let adist = (a_cross - a_right).abs();
     let fdist = (f_cross - fmin - up).abs();
-    let tla_scaled = if aopt.abs() > 1.0 { tla * aopt.abs() } else { tla };
+    let tla_scaled = if aopt.abs() > 1.0 {
+        tla * aopt.abs()
+    } else {
+        tla
+    };
 
     if adist < tla_scaled && fdist < tlf {
         let state = mgr_cross.user_state().clone();
@@ -194,11 +198,7 @@ pub fn find_crossing(
 
     // --- Phase 7: Parabolic convergence ---
     // We have 3 points: (a_left, f_left), (a_right, f_right), (a_cross, f_cross)
-    let mut pts = Vec::from([
-        (a_left, f_left),
-        (a_right, f_right),
-        (a_cross, f_cross),
-    ]);
+    let mut pts = Vec::from([(a_left, f_left), (a_right, f_right), (a_cross, f_cross)]);
     pts.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
     let maxitr = 15;
@@ -279,7 +279,11 @@ pub fn find_crossing(
         // Check convergence
         let adist = (a_cross - pts[1].0).abs();
         let fdist = (f_new - target).abs();
-        let tla_scaled = if aopt.abs() > 1.0 { tla * aopt.abs() } else { tla };
+        let tla_scaled = if aopt.abs() > 1.0 {
+            tla * aopt.abs()
+        } else {
+            tla
+        };
 
         if adist < tla_scaled && fdist < tlf {
             let state = mgr.user_state().clone();
@@ -347,7 +351,8 @@ fn run_migrad_fixed(
 
     // Also fix any parameters that were fixed in the original
     for i in 0..nparams {
-        if i != fix_par && user_state.parameter(i).is_fixed() && !user_state.parameter(i).is_const() {
+        if i != fix_par && user_state.parameter(i).is_fixed() && !user_state.parameter(i).is_const()
+        {
             builder = builder.fix(i);
         }
     }

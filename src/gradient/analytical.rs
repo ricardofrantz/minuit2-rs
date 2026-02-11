@@ -205,7 +205,10 @@ mod tests {
         assert!(grad.gstep()[1] > 0.0, "gstep[1] should be positive");
 
         // Check that it's marked as analytical
-        assert!(grad.is_analytical(), "gradient should be marked as analytical");
+        assert!(
+            grad.is_analytical(),
+            "gradient should be marked as analytical"
+        );
     }
 
     #[test]

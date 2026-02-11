@@ -1,5 +1,5 @@
-use crate::precision::MnMachinePrecision;
 use super::ParameterTransform;
+use crate::precision::MnMachinePrecision;
 
 /// Square-root transform for lower-bounded parameters.
 ///
@@ -49,7 +49,10 @@ mod tests {
         for &ext in &[3.0, 5.0, 100.0] {
             let int = t.ext2int(ext, f64::INFINITY, lo, &prec);
             let back = t.int2ext(int, f64::INFINITY, lo);
-            assert!((back - ext).abs() < 1e-10, "roundtrip failed for {ext}: got {back}");
+            assert!(
+                (back - ext).abs() < 1e-10,
+                "roundtrip failed for {ext}: got {back}"
+            );
         }
     }
 

@@ -72,10 +72,10 @@ impl<'a> MnContours<'a> {
 
         // The 4 cardinal points (approximate — on the contour boundary)
         let mut pts = vec![
-            (x_up, y_val),   // right
-            (x_val, y_up),   // top
-            (x_lo, y_val),   // left
-            (x_val, y_lo),   // bottom
+            (x_up, y_val), // right
+            (x_val, y_up), // top
+            (x_lo, y_val), // left
+            (x_val, y_lo), // bottom
         ];
 
         if npoints <= 4 {
@@ -159,7 +159,8 @@ impl<'a> MnContours<'a> {
             let new_y = y_val + dir_y * ratio;
 
             // Check it's a reasonable point
-            let seg_dist = ((new_x - pts[max_idx].0).powi(2) + (new_y - pts[max_idx].1).powi(2)).sqrt();
+            let seg_dist =
+                ((new_x - pts[max_idx].0).powi(2) + (new_y - pts[max_idx].1).powi(2)).sqrt();
             if seg_dist < 1e-10 {
                 continue;
             }

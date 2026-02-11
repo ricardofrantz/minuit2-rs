@@ -90,7 +90,13 @@ impl FunctionMinimum {
                 uparams.add_const(p.name(), p.value());
             } else if p.is_fixed() {
                 if p.has_limits() {
-                    uparams.add_limited(p.name(), p.value(), p.error(), p.lower_limit(), p.upper_limit());
+                    uparams.add_limited(
+                        p.name(),
+                        p.value(),
+                        p.error(),
+                        p.lower_limit(),
+                        p.upper_limit(),
+                    );
                 } else if p.has_lower_limit() {
                     uparams.add_lower_limited(p.name(), p.value(), p.error(), p.lower_limit());
                 } else if p.has_upper_limit() {
@@ -232,7 +238,9 @@ impl FunctionMinimum {
 
     /// Parameter values in external (user) space.
     pub fn params(&self) -> Vec<f64> {
-        self.seed.trafo().transform(self.state().parameters().vec().as_slice())
+        self.seed
+            .trafo()
+            .transform(self.state().parameters().vec().as_slice())
     }
 
     /// Number of variable parameters.

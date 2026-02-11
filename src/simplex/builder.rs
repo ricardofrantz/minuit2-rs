@@ -8,11 +8,11 @@
 
 use nalgebra::DVector;
 
+use super::parameters::SimplexParameters;
 use crate::minimum::parameters::MinimumParameters;
 use crate::minimum::seed::MinimumSeed;
 use crate::minimum::state::MinimumState;
 use crate::mn_fcn::MnFcn;
-use super::parameters::SimplexParameters;
 
 pub struct SimplexBuilder;
 
@@ -27,9 +27,7 @@ impl SimplexBuilder {
         let prec = seed.precision();
 
         let x = seed.parameters().vec().clone();
-        let mut step: Vec<f64> = (0..n)
-            .map(|i| 10.0 * seed.gradient().gstep()[i])
-            .collect();
+        let mut step: Vec<f64> = (0..n).map(|i| 10.0 * seed.gradient().gstep()[i]).collect();
 
         let alpha = 1.0_f64;
         let beta = 0.5_f64;
@@ -195,15 +193,23 @@ impl SimplexBuilder {
         // Compute dirin from simplex spread, scaled by sqrt(up/edm)
         let edm = simplex.edm();
         let up = fcn.up();
-        let scale = if edm > f64::MIN_POSITIVE { (up / edm).sqrt() } else { 1.0 };
+        let scale = if edm > f64::MIN_POSITIVE {
+            (up / edm).sqrt()
+        } else {
+            1.0
+        };
 
         let mut dirin = vec![0.0; n];
         for i in 0..n {
             let mut lo = f64::MAX;
             let mut hi = f64::MIN;
             for (_, v) in simplex.params().iter() {
-                if v[i] < lo { lo = v[i]; }
-                if v[i] > hi { hi = v[i]; }
+                if v[i] < lo {
+                    lo = v[i];
+                }
+                if v[i] > hi {
+                    hi = v[i];
+                }
             }
             dirin[i] = (hi - lo) * scale;
         }

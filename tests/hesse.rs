@@ -1,4 +1,4 @@
-use minuit2::{MnMigrad, MnHesse};
+use minuit2::{MnHesse, MnMigrad};
 
 /// Quadratic: f(x,y) = a*x^2 + b*y^2
 /// ROOT Minuit2 user covariance convention: V = 2 * up * H^-1.
@@ -16,10 +16,8 @@ fn hesse_quadratic_errors() {
     assert!(result.is_valid());
 
     // Run Hesse
-    let hesse_result = MnHesse::new().calculate(
-        &|p: &[f64]| a * p[0] * p[0] + b * p[1] * p[1],
-        &result,
-    );
+    let hesse_result =
+        MnHesse::new().calculate(&|p: &[f64]| a * p[0] * p[0] + b * p[1] * p[1], &result);
 
     assert!(hesse_result.is_valid());
 
@@ -46,9 +44,7 @@ fn hesse_quadratic_errors() {
 /// Rosenbrock: Hesse after Migrad should give valid covariance.
 #[test]
 fn hesse_rosenbrock_valid() {
-    let rosenbrock = |p: &[f64]| {
-        (1.0 - p[0]).powi(2) + 100.0 * (p[1] - p[0] * p[0]).powi(2)
-    };
+    let rosenbrock = |p: &[f64]| (1.0 - p[0]).powi(2) + 100.0 * (p[1] - p[0] * p[0]).powi(2);
 
     let result = MnMigrad::new()
         .add("x", 0.0, 0.1)
@@ -113,10 +109,8 @@ fn hesse_calculate_errors() {
         .add("y", -3.0, 1.0)
         .minimize(&|p: &[f64]| 2.0 * p[0] * p[0] + 8.0 * p[1] * p[1]);
 
-    let state = MnHesse::new().calculate_errors(
-        &|p: &[f64]| 2.0 * p[0] * p[0] + 8.0 * p[1] * p[1],
-        &result,
-    );
+    let state = MnHesse::new()
+        .calculate_errors(&|p: &[f64]| 2.0 * p[0] * p[0] + 8.0 * p[1] * p[1], &result);
 
     assert!(state.has_covariance());
     let err_x = state.error("x").unwrap();

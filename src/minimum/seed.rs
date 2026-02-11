@@ -3,8 +3,8 @@
 //! Replaces BasicMinimumSeed.h. The seed is constructed by a `SeedGenerator`
 //! (e.g., `SimplexSeedGenerator`) and passed to a `MinimumBuilder`.
 
-use crate::user_transformation::MnUserTransformation;
 use super::state::MinimumState;
+use crate::user_transformation::MnUserTransformation;
 
 #[derive(Debug, Clone)]
 pub struct MinimumSeed {

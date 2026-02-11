@@ -140,11 +140,7 @@ mod tests {
 
     #[test]
     fn update_recomputes() {
-        let params = vec![
-            (3.0, vec![1.0]),
-            (1.0, vec![2.0]),
-            (5.0, vec![3.0]),
-        ];
+        let params = vec![(3.0, vec![1.0]), (1.0, vec![2.0]), (5.0, vec![3.0])];
         let mut sp = SimplexParameters::new(params);
         sp.update(2, 0.5, vec![4.0]); // vertex 2 is now best
         assert_eq!(sp.jlow(), 2);

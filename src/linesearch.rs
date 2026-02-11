@@ -196,8 +196,8 @@ pub fn brent_search(
 mod tests {
     use super::*;
     use crate::fcn::FCN;
-    use crate::user_transformation::MnUserTransformation;
     use crate::parameter::MinuitParameter;
+    use crate::user_transformation::MnUserTransformation;
 
     struct Quadratic;
     impl FCN for Quadratic {
@@ -222,6 +222,10 @@ mod tests {
 
         // Optimal step for f(2-λ) = (2-λ)² is λ=2, giving f=0
         assert!(result.y < 4.0, "line search should improve: f={}", result.y);
-        assert!(result.y < 0.1, "line search should find near-minimum: f={}", result.y);
+        assert!(
+            result.y < 0.1,
+            "line search should find near-minimum: f={}",
+            result.y
+        );
     }
 }

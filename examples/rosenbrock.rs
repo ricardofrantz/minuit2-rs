@@ -11,9 +11,7 @@ fn main() {
         .add("x", -1.0, 1.0)
         .add("y", -1.0, 1.0)
         .max_fcn(10000)
-        .minimize(&|p: &[f64]| {
-            (1.0 - p[0]).powi(2) + 100.0 * (p[1] - p[0] * p[0]).powi(2)
-        });
+        .minimize(&|p: &[f64]| (1.0 - p[0]).powi(2) + 100.0 * (p[1] - p[0] * p[0]).powi(2));
 
     println!("{result}");
 

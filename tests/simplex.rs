@@ -10,9 +10,7 @@ fn rosenbrock_2d() {
         // With ROOT-compatible Simplex EDM criterion, use a tighter tolerance
         // for Rosenbrock to ensure full convergence.
         .tolerance(1.0e-5)
-        .minimize(&|p: &[f64]| {
-            (1.0 - p[0]).powi(2) + 100.0 * (p[1] - p[0] * p[0]).powi(2)
-        });
+        .minimize(&|p: &[f64]| (1.0 - p[0]).powi(2) + 100.0 * (p[1] - p[0] * p[0]).powi(2));
 
     assert!(result.is_valid(), "minimization should converge");
 
@@ -76,9 +74,7 @@ fn gaussian_fit() {
     let x_data: Vec<f64> = (0..n_data).map(|i| i as f64 * 0.2).collect();
     let y_data: Vec<f64> = x_data
         .iter()
-        .map(|&x| {
-            true_amp * (-(x - true_mean).powi(2) / (2.0 * true_sigma * true_sigma)).exp()
-        })
+        .map(|&x| true_amp * (-(x - true_mean).powi(2) / (2.0 * true_sigma * true_sigma)).exp())
         .collect();
 
     // Chi-square: sum of (model - data)^2
@@ -135,10 +131,7 @@ fn bounded_parameters() {
 
     assert!(result.is_valid(), "bounded min should converge");
     let x = result.params()[0];
-    assert!(
-        (x - 3.0).abs() < 0.1,
-        "x should be near 3.0, got {x}"
-    );
+    assert!((x - 3.0).abs() < 0.1, "x should be near 3.0, got {x}");
     assert!((0.0..=5.0).contains(&x), "x should be within bounds");
 }
 

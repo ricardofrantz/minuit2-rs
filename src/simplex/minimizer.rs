@@ -3,12 +3,12 @@
 //! Replaces SimplexMinimizer.h. This is the internal minimizer component
 //! that the public `MnSimplex` API delegates to.
 
+use super::builder::SimplexBuilder;
+use super::seed::SimplexSeedGenerator;
 use crate::minimum::FunctionMinimum;
 use crate::mn_fcn::MnFcn;
 use crate::strategy::MnStrategy;
 use crate::user_transformation::MnUserTransformation;
-use super::builder::SimplexBuilder;
-use super::seed::SimplexSeedGenerator;
 
 pub struct SimplexMinimizer;
 

@@ -6,7 +6,7 @@
 //!
 //! Run: cargo run --example gaussian_fit
 
-use minuit2::{MnHesse, MnMigrad, MnMinos, FCN};
+use minuit2::{FCN, MnHesse, MnMigrad, MnMinos};
 
 /// Chi-square FCN for Gaussian model fit.
 struct GaussianChi2 {
@@ -69,8 +69,13 @@ fn main() {
         .minimize(&fcn);
 
     let ndf = x.len() as f64 - 3.0;
-    println!("Migrad: valid={}, chi2={:.2}, ndf={:.0}, chi2/ndf={:.2}",
-        result.is_valid(), result.fval(), ndf, result.fval() / ndf);
+    println!(
+        "Migrad: valid={}, chi2={:.2}, ndf={:.0}, chi2/ndf={:.2}",
+        result.is_valid(),
+        result.fval(),
+        ndf,
+        result.fval() / ndf
+    );
 
     // Step 2: Hesse
     let hesse = MnHesse::new().calculate(&fcn, &result);
@@ -78,7 +83,12 @@ fn main() {
 
     println!("\nHesse errors:");
     for name in &["A", "mu", "sigma"] {
-        println!("  {} = {:.4} +/- {:.4}", name, hs.value(name).unwrap(), hs.error(name).unwrap());
+        println!(
+            "  {} = {:.4} +/- {:.4}",
+            name,
+            hs.value(name).unwrap(),
+            hs.error(name).unwrap()
+        );
     }
 
     // Step 3: Minos
@@ -88,8 +98,13 @@ fn main() {
     for (i, name) in ["A", "mu", "sigma"].iter().enumerate() {
         let me = minos.minos_error(i);
         if me.is_valid() {
-            println!("  {} = {:.4}  {:.4} / +{:.4}",
-                name, hs.value(name).unwrap(), me.lower_error(), me.upper_error());
+            println!(
+                "  {} = {:.4}  {:.4} / +{:.4}",
+                name,
+                hs.value(name).unwrap(),
+                me.lower_error(),
+                me.upper_error()
+            );
         } else {
             println!("  {}: Minos did not converge", name);
         }

@@ -120,7 +120,10 @@ fn minos_fixed_parameter() {
 
     // Regression: min() must not panic even when Minos crossings are invalid.
     let me = minos.minos_error(1);
-    assert!(!me.is_valid(), "MinosError should be invalid for const param");
+    assert!(
+        !me.is_valid(),
+        "MinosError should be invalid for const param"
+    );
     assert!(
         me.min().is_finite(),
         "min() should still return a finite original parameter value"

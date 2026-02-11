@@ -3,8 +3,8 @@
 //! Replaces MnPosDef.cxx. Uses eigendecomposition to detect and correct
 //! non-positive-definite error matrices by shifting eigenvalues.
 
-use nalgebra::DMatrix;
 use crate::precision::MnMachinePrecision;
+use nalgebra::DMatrix;
 
 /// Force `mat` to be positive-definite by shifting eigenvalues if needed.
 ///

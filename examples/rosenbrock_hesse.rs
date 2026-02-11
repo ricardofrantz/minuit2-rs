@@ -11,9 +11,7 @@ use minuit2::{MnHesse, MnMigrad};
 fn main() {
     println!("=== Rosenbrock: Migrad + Hesse ===\n");
 
-    let rosenbrock = |p: &[f64]| {
-        (1.0 - p[0]).powi(2) + 100.0 * (p[1] - p[0] * p[0]).powi(2)
-    };
+    let rosenbrock = |p: &[f64]| (1.0 - p[0]).powi(2) + 100.0 * (p[1] - p[0] * p[0]).powi(2);
 
     // Step 1: Migrad
     let result = MnMigrad::new()
@@ -28,8 +26,16 @@ fn main() {
     println!("  edm   = {:.6e}", result.edm());
 
     let state = result.user_state();
-    println!("  x = {:.6} +/- {:.6}", state.value("x").unwrap(), state.error("x").unwrap());
-    println!("  y = {:.6} +/- {:.6}", state.value("y").unwrap(), state.error("y").unwrap());
+    println!(
+        "  x = {:.6} +/- {:.6}",
+        state.value("x").unwrap(),
+        state.error("x").unwrap()
+    );
+    println!(
+        "  y = {:.6} +/- {:.6}",
+        state.value("y").unwrap(),
+        state.error("y").unwrap()
+    );
 
     // Step 2: Hesse for accurate covariance
     let hesse = MnHesse::new().calculate(&rosenbrock, &result);
@@ -38,9 +44,20 @@ fn main() {
     println!("  valid = {}", hesse.is_valid());
 
     let hs = hesse.user_state();
-    println!("  x = {:.6} +/- {:.6}", hs.value("x").unwrap(), hs.error("x").unwrap());
-    println!("  y = {:.6} +/- {:.6}", hs.value("y").unwrap(), hs.error("y").unwrap());
-    println!("  covariance: {}", if hs.has_covariance() { "yes" } else { "no" });
+    println!(
+        "  x = {:.6} +/- {:.6}",
+        hs.value("x").unwrap(),
+        hs.error("x").unwrap()
+    );
+    println!(
+        "  y = {:.6} +/- {:.6}",
+        hs.value("y").unwrap(),
+        hs.error("y").unwrap()
+    );
+    println!(
+        "  covariance: {}",
+        if hs.has_covariance() { "yes" } else { "no" }
+    );
 
     if let Some(gcc) = hs.global_cc() {
         println!("  global correlations: [{:.4}, {:.4}]", gcc[0], gcc[1]);

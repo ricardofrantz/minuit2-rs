@@ -58,7 +58,11 @@ fn migrad_analytical_quadratic() {
 
     // Check convergence
     assert!(result.is_valid(), "Minimization should converge");
-    assert!(result.fval() < 1e-8, "Should reach near-zero: {}", result.fval());
+    assert!(
+        result.fval() < 1e-8,
+        "Should reach near-zero: {}",
+        result.fval()
+    );
 
     // Check parameters
     let state = result.user_state();
@@ -90,9 +94,7 @@ fn migrad_analytical_rosenbrock() {
 #[test]
 fn migrad_analytical_vs_numerical_quadratic() {
     // Compare analytical and numerical gradients on quadratic
-    let migrad = MnMigrad::new()
-        .add("x", 3.0, 0.1)
-        .add("y", 2.0, 0.1);
+    let migrad = MnMigrad::new().add("x", 3.0, 0.1).add("y", 2.0, 0.1);
 
     let result_analytical = migrad.minimize_grad(&Quadratic);
     let result_numerical = migrad.minimize(&Quadratic);

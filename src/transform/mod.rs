@@ -21,7 +21,13 @@ pub trait ParameterTransform {
     fn int2ext(&self, value: f64, upper: f64, lower: f64) -> f64;
 
     /// Transform external value to internal (optimizer) space.
-    fn ext2int(&self, value: f64, upper: f64, lower: f64, precision: &crate::precision::MnMachinePrecision) -> f64;
+    fn ext2int(
+        &self,
+        value: f64,
+        upper: f64,
+        lower: f64,
+        precision: &crate::precision::MnMachinePrecision,
+    ) -> f64;
 
     /// Derivative d(external)/d(internal).
     fn dint2ext(&self, value: f64, upper: f64, lower: f64) -> f64;

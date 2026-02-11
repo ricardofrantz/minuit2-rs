@@ -100,7 +100,11 @@ impl<'a> MnMinos<'a> {
         let direction = if dir < 0 { -1.0 } else { 1.0 };
         let nvar = self.minimum.n_variable_params();
         let default_calls = 2 * (nvar + 1) * (200 + 100 * nvar + 5 * nvar * nvar);
-        let maxcalls = if maxcalls == 0 { default_calls } else { maxcalls };
+        let maxcalls = if maxcalls == 0 {
+            default_calls
+        } else {
+            maxcalls
+        };
 
         let user_state = self.minimum.user_state();
         let p = user_state.parameter(par);
@@ -122,7 +126,8 @@ impl<'a> MnMinos<'a> {
 
     fn find_crossing(&self, par: usize, direction: f64) -> MnCross {
         let nvar = self.minimum.n_variable_params();
-        let maxcalls = self.max_calls
+        let maxcalls = self
+            .max_calls
             .unwrap_or(2 * (nvar + 1) * (200 + 100 * nvar + 5 * nvar * nvar));
 
         let user_state = self.minimum.user_state();

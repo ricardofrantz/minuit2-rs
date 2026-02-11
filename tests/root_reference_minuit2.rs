@@ -176,7 +176,11 @@ fn root_simplex_reference_quadratic2() {
         "fval mismatch: {}",
         min.fval()
     );
-    assert!((min.edm() - 0.0334887).abs() < 5e-4, "edm mismatch: {}", min.edm());
+    assert!(
+        (min.edm() - 0.0334887).abs() < 5e-4,
+        "edm mismatch: {}",
+        min.edm()
+    );
 }
 
 /// Regression for ROOT v6-36-08 parity:
@@ -196,11 +200,23 @@ fn root_minimize_reference_rosenbrock2() {
         min.user_state().has_covariance(),
         "MnMinimize should end with covariance for this workload"
     );
-    assert!(min.nfcn() > 50, "unexpectedly low call count: {}", min.nfcn());
+    assert!(
+        min.nfcn() > 50,
+        "unexpectedly low call count: {}",
+        min.nfcn()
+    );
 
     let params = min.params();
-    assert!((params[0] - 0.99415).abs() < 0.02, "x mismatch: {}", params[0]);
-    assert!((params[1] - 0.98827).abs() < 0.02, "y mismatch: {}", params[1]);
+    assert!(
+        (params[0] - 0.99415).abs() < 0.02,
+        "x mismatch: {}",
+        params[0]
+    );
+    assert!(
+        (params[1] - 0.98827).abs() < 0.02,
+        "y mismatch: {}",
+        params[1]
+    );
 }
 
 /// Port of ROOT test intent `NoG2CallsWhenFCHasNoG2`:

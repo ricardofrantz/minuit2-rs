@@ -1,4 +1,6 @@
-use minuit2::{FCN, FCNGradient, MnContours, MnHesse, MnMinimize, MnMigrad, MnMinos, MnScan, MnSimplex};
+use minuit2::{
+    FCN, FCNGradient, MnContours, MnHesse, MnMigrad, MnMinimize, MnMinos, MnScan, MnSimplex,
+};
 
 #[derive(Debug, Clone)]
 struct RunResult {
@@ -99,7 +101,11 @@ fn to_json(result: &RunResult) -> String {
             "false"
         },
         cov_json,
-        if result.minos.is_some() { "true" } else { "false" },
+        if result.minos.is_some() {
+            "true"
+        } else {
+            "false"
+        },
         minos_json
     )
 }

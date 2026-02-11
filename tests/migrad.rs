@@ -8,9 +8,7 @@ fn rosenbrock_2d() {
         .add("x", -1.0, 1.0)
         .add("y", -1.0, 1.0)
         .tolerance(0.1) // tighter than default for precise convergence
-        .minimize(&|p: &[f64]| {
-            (1.0 - p[0]).powi(2) + 100.0 * (p[1] - p[0] * p[0]).powi(2)
-        });
+        .minimize(&|p: &[f64]| (1.0 - p[0]).powi(2) + 100.0 * (p[1] - p[0] * p[0]).powi(2));
 
     assert!(result.is_valid(), "migrad should converge");
 
@@ -70,17 +68,11 @@ fn nd_quadratic() {
         .add("x2", 7.0, 1.0)
         .add("x3", -5.0, 1.0)
         .add("x4", 1.0, 1.0)
-        .minimize(&|p: &[f64]| {
-            p.iter().map(|x| x * x).sum()
-        });
+        .minimize(&|p: &[f64]| p.iter().map(|x| x * x).sum());
 
     assert!(result.is_valid(), "N-dim quadratic should converge");
     for (i, &val) in result.params().iter().enumerate() {
-        assert!(
-            val.abs() < 1e-3,
-            "x{} should be near 0, got {}",
-            i, val
-        );
+        assert!(val.abs() < 1e-3, "x{} should be near 0, got {}", i, val);
     }
 }
 
@@ -94,10 +86,7 @@ fn bounded_parameters() {
 
     assert!(result.is_valid(), "bounded min should converge");
     let x = result.params()[0];
-    assert!(
-        (x - 3.0).abs() < 0.05,
-        "x should be near 3.0, got {x}"
-    );
+    assert!((x - 3.0).abs() < 0.05, "x should be near 3.0, got {x}");
     assert!((0.0..=5.0).contains(&x), "x should be within bounds: {x}");
 }
 
@@ -142,9 +131,7 @@ fn gaussian_fit() {
     let x_data: Vec<f64> = (0..n_data).map(|i| i as f64 * 0.2).collect();
     let y_data: Vec<f64> = x_data
         .iter()
-        .map(|&x| {
-            true_amp * (-(x - true_mean).powi(2) / (2.0 * true_sigma * true_sigma)).exp()
-        })
+        .map(|&x| true_amp * (-(x - true_mean).powi(2) / (2.0 * true_sigma * true_sigma)).exp())
         .collect();
 
     let chi2 = move |p: &[f64]| -> f64 {
@@ -194,7 +181,10 @@ fn gaussian_fit() {
 fn migrad_vs_simplex_quadratic() {
     // On a 5D quadratic bowl, Migrad should converge much faster
     let quadratic = |p: &[f64]| -> f64 {
-        p.iter().enumerate().map(|(i, &x)| (i as f64 + 1.0) * x * x).sum()
+        p.iter()
+            .enumerate()
+            .map(|(i, &x)| (i as f64 + 1.0) * x * x)
+            .sum()
     };
 
     let migrad_result = MnMigrad::new()
@@ -215,7 +205,9 @@ fn migrad_vs_simplex_quadratic() {
 
     assert!(migrad_result.is_valid());
     assert!(
-        simplex_result.reached_call_limit() || simplex_result.is_above_max_edm() || simplex_result.is_valid(),
+        simplex_result.reached_call_limit()
+            || simplex_result.is_above_max_edm()
+            || simplex_result.is_valid(),
         "unexpected simplex termination flags"
     );
 

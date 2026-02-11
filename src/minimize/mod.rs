@@ -7,10 +7,10 @@
 //! This hybrid approach is robust for difficult functions and has fast convergence near the minimum.
 //! Uses a builder pattern to configure parameters, then call `minimize()`.
 
-use crate::fcn::FCN;
 use crate::application::DEFAULT_TOLERANCE;
-use crate::minimum::FunctionMinimum;
+use crate::fcn::FCN;
 use crate::migrad::MnMigrad;
+use crate::minimum::FunctionMinimum;
 use crate::simplex::MnSimplex;
 use crate::strategy::MnStrategy;
 use crate::user_parameters::MnUserParameters;
@@ -47,19 +47,38 @@ impl MnMinimize {
     }
 
     /// Add a parameter with both bounds.
-    pub fn add_limited(mut self, name: impl Into<String>, value: f64, error: f64, lower: f64, upper: f64) -> Self {
+    pub fn add_limited(
+        mut self,
+        name: impl Into<String>,
+        value: f64,
+        error: f64,
+        lower: f64,
+        upper: f64,
+    ) -> Self {
         self.params.add_limited(name, value, error, lower, upper);
         self
     }
 
     /// Add a parameter with lower bound only.
-    pub fn add_lower_limited(mut self, name: impl Into<String>, value: f64, error: f64, lower: f64) -> Self {
+    pub fn add_lower_limited(
+        mut self,
+        name: impl Into<String>,
+        value: f64,
+        error: f64,
+        lower: f64,
+    ) -> Self {
         self.params.add_lower_limited(name, value, error, lower);
         self
     }
 
     /// Add a parameter with upper bound only.
-    pub fn add_upper_limited(mut self, name: impl Into<String>, value: f64, error: f64, upper: f64) -> Self {
+    pub fn add_upper_limited(
+        mut self,
+        name: impl Into<String>,
+        value: f64,
+        error: f64,
+        upper: f64,
+    ) -> Self {
         self.params.add_upper_limited(name, value, error, upper);
         self
     }
@@ -128,10 +147,7 @@ impl MnMinimize {
         simplex
     }
 
-    fn configure_migrad_from_params(
-        mut migrad: MnMigrad,
-        params: &MnUserParameters,
-    ) -> MnMigrad {
+    fn configure_migrad_from_params(mut migrad: MnMigrad, params: &MnUserParameters) -> MnMigrad {
         for param in params.params() {
             if param.is_const() {
                 migrad = migrad.add_const(param.name(), param.value());
@@ -214,11 +230,7 @@ impl MnMinimize {
         .tolerance(self.tolerance);
         let min2 = migrad2.minimize(fcn);
 
-        if min2.is_valid() {
-            min2
-        } else {
-            simplex_min
-        }
+        if min2.is_valid() { min2 } else { simplex_min }
     }
 }
 

@@ -21,7 +21,9 @@ pub struct InitialGradientCalculator {
 
 impl InitialGradientCalculator {
     pub fn new(strategy: MnStrategy) -> Self {
-        Self { _strategy: strategy }
+        Self {
+            _strategy: strategy,
+        }
     }
 
     pub fn compute(

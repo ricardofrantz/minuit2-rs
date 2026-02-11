@@ -8,8 +8,8 @@ pub mod minimizer;
 pub mod parameters;
 pub mod seed;
 
-use crate::fcn::FCN;
 use crate::application::DEFAULT_TOLERANCE;
+use crate::fcn::FCN;
 use crate::minimum::FunctionMinimum;
 use crate::mn_fcn::MnFcn;
 use crate::strategy::MnStrategy;
@@ -49,19 +49,38 @@ impl MnSimplex {
     }
 
     /// Add a parameter with both bounds.
-    pub fn add_limited(mut self, name: impl Into<String>, value: f64, error: f64, lower: f64, upper: f64) -> Self {
+    pub fn add_limited(
+        mut self,
+        name: impl Into<String>,
+        value: f64,
+        error: f64,
+        lower: f64,
+        upper: f64,
+    ) -> Self {
         self.params.add_limited(name, value, error, lower, upper);
         self
     }
 
     /// Add a parameter with lower bound only.
-    pub fn add_lower_limited(mut self, name: impl Into<String>, value: f64, error: f64, lower: f64) -> Self {
+    pub fn add_lower_limited(
+        mut self,
+        name: impl Into<String>,
+        value: f64,
+        error: f64,
+        lower: f64,
+    ) -> Self {
         self.params.add_lower_limited(name, value, error, lower);
         self
     }
 
     /// Add a parameter with upper bound only.
-    pub fn add_upper_limited(mut self, name: impl Into<String>, value: f64, error: f64, upper: f64) -> Self {
+    pub fn add_upper_limited(
+        mut self,
+        name: impl Into<String>,
+        value: f64,
+        error: f64,
+        upper: f64,
+    ) -> Self {
         self.params.add_upper_limited(name, value, error, upper);
         self
     }

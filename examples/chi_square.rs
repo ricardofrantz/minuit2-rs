@@ -5,7 +5,7 @@
 //!
 //! Run: cargo run --example chi_square
 
-use minuit2::{MnHesse, MnMigrad, MnScan, FCN};
+use minuit2::{FCN, MnHesse, MnMigrad, MnScan};
 
 /// Chi-square FCN for quadratic polynomial.
 struct PolyChi2 {
@@ -45,7 +45,10 @@ fn main() {
         .map(|(i, &yt)| yt + 0.2 * ((i as f64) * 2.3).sin())
         .collect();
     // 5% relative error, minimum 0.3
-    let sigma: Vec<f64> = y_true.iter().map(|&yt| (0.05 * yt.abs()).max(0.3)).collect();
+    let sigma: Vec<f64> = y_true
+        .iter()
+        .map(|&yt| (0.05 * yt.abs()).max(0.3))
+        .collect();
 
     let fcn = PolyChi2 {
         x: x.clone(),
@@ -63,8 +66,13 @@ fn main() {
         .minimize(&fcn);
 
     let ndf = x.len() as f64 - 3.0;
-    println!("Migrad: valid={}, chi2={:.2}, ndf={:.0}, chi2/ndf={:.2}",
-        result.is_valid(), result.fval(), ndf, result.fval() / ndf);
+    println!(
+        "Migrad: valid={}, chi2={:.2}, ndf={:.0}, chi2/ndf={:.2}",
+        result.is_valid(),
+        result.fval(),
+        ndf,
+        result.fval() / ndf
+    );
 
     // Step 2: Hesse
     let hesse = MnHesse::new().calculate(&fcn, &result);
@@ -72,7 +80,12 @@ fn main() {
 
     println!("\nFitted parameters:");
     for name in &["c0", "c1", "c2"] {
-        println!("  {} = {:.6} +/- {:.6}", name, hs.value(name).unwrap(), hs.error(name).unwrap());
+        println!(
+            "  {} = {:.6} +/- {:.6}",
+            name,
+            hs.value(name).unwrap(),
+            hs.error(name).unwrap()
+        );
     }
 
     // Step 3: Scan c2
@@ -85,6 +98,9 @@ fn main() {
         println!("  {:10.6} {:12.4}", c2_val, chi2_val);
     }
 
-    let min_pt = points.iter().min_by(|a, b| a.1.partial_cmp(&b.1).unwrap()).unwrap();
+    let min_pt = points
+        .iter()
+        .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+        .unwrap();
     println!("\n  Scan minimum: c2={:.6}, chi2={:.4}", min_pt.0, min_pt.1);
 }

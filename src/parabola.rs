@@ -112,11 +112,7 @@ pub fn from_2_points_gradient(
 }
 
 /// Fit a parabola through three points using the C++ MnParabola::operator() formula.
-pub fn from_3_points(
-    p1: MnParabolaPoint,
-    p2: MnParabolaPoint,
-    p3: MnParabolaPoint,
-) -> MnParabola {
+pub fn from_3_points(p1: MnParabolaPoint, p2: MnParabolaPoint, p3: MnParabolaPoint) -> MnParabola {
     // Standard Lagrange interpolation for 3 points, rearranged to ax²+bx+c
     let x1 = p1.x;
     let x2 = p2.x;

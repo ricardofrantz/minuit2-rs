@@ -1,7 +1,7 @@
 use std::f64::consts::FRAC_PI_2;
 
-use crate::precision::MnMachinePrecision;
 use super::ParameterTransform;
+use crate::precision::MnMachinePrecision;
 
 /// Sine transform for doubly-bounded parameters.
 ///

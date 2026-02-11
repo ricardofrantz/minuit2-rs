@@ -63,11 +63,7 @@ impl VariableMetricBuilder {
         );
 
         let states2 = Self::iterate(fcn, &seed2, strategy, maxfcn2, edmval);
-        if states2.is_empty() {
-            states
-        } else {
-            states2
-        }
+        if states2.is_empty() { states } else { states2 }
     }
 
     /// Top-level Migrad minimization with analytical gradients.
@@ -109,11 +105,7 @@ impl VariableMetricBuilder {
         );
 
         let states2 = Self::iterate_with_gradient(fcn, gradient_fcn, &seed2, maxfcn2, edmval);
-        if states2.is_empty() {
-            states
-        } else {
-            states2
-        }
+        if states2.is_empty() { states } else { states2 }
     }
 
     /// Core iteration loop: Newton step → line search → gradient → DFP update.
@@ -194,19 +186,11 @@ impl VariableMetricBuilder {
 
             // 4. Update parameters: p_new = p_old + λ * step
             let p_new = params.vec() + lambda * &current_step;
-            let new_params = MinimumParameters::with_step(
-                p_new,
-                lambda * &current_step,
-                f_new,
-            );
+            let new_params = MinimumParameters::with_step(p_new, lambda * &current_step, f_new);
 
             // 5. Compute new gradient using previous gradient's step sizes
-            let new_gradient = grad_calc.compute_with_previous(
-                fcn,
-                &new_params,
-                seed.trafo(),
-                &gradient,
-            );
+            let new_gradient =
+                grad_calc.compute_with_previous(fcn, &new_params, seed.trafo(), &gradient);
 
             // 6. DFP update of V
             let (v_updated, new_dcovar) = Self::dfp_update(
@@ -334,18 +318,11 @@ impl VariableMetricBuilder {
 
             // 4. Update parameters: p_new = p_old + λ * step
             let p_new = params.vec() + lambda * &current_step;
-            let new_params = MinimumParameters::with_step(
-                p_new,
-                lambda * &current_step,
-                f_new,
-            );
+            let new_params = MinimumParameters::with_step(p_new, lambda * &current_step, f_new);
 
             // 5. Compute new gradient using analytical gradient calculator
-            let new_gradient = AnalyticalGradientCalculator::compute(
-                gradient_fcn,
-                seed.trafo(),
-                &new_params,
-            );
+            let new_gradient =
+                AnalyticalGradientCalculator::compute(gradient_fcn, seed.trafo(), &new_params);
 
             // 6. DFP update of V
             let (v_updated, new_dcovar) = Self::dfp_update(

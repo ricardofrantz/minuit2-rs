@@ -21,7 +21,13 @@ pub struct MinosError {
 }
 
 impl MinosError {
-    pub fn new(parameter: usize, min: f64, hesse_error: f64, lower: MnCross, upper: MnCross) -> Self {
+    pub fn new(
+        parameter: usize,
+        min: f64,
+        hesse_error: f64,
+        lower: MnCross,
+        upper: MnCross,
+    ) -> Self {
         Self {
             parameter,
             min,

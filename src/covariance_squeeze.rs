@@ -40,7 +40,10 @@ pub fn squeeze_matrix(mat: &DMatrix<f64>, n: usize) -> DMatrix<f64> {
 /// If inversion fails, returns a diagonal matrix from the remaining elements.
 pub fn squeeze_user_covariance(cov: &MnUserCovariance, n: usize) -> MnUserCovariance {
     let nrow = cov.nrow();
-    assert!(n < nrow, "index {n} out of range for {nrow}x{nrow} covariance");
+    assert!(
+        n < nrow,
+        "index {n} out of range for {nrow}x{nrow} covariance"
+    );
 
     // Convert to DMatrix
     let mut mat = DMatrix::zeros(nrow, nrow);
@@ -85,7 +88,10 @@ pub fn squeeze_user_covariance(cov: &MnUserCovariance, n: usize) -> MnUserCovari
 pub fn squeeze_error(err: &MinimumError, n: usize) -> MinimumError {
     let mat = err.matrix();
     let dim = mat.nrows();
-    assert!(n < dim, "index {n} out of range for {dim}x{dim} error matrix");
+    assert!(
+        n < dim,
+        "index {n} out of range for {dim}x{dim} error matrix"
+    );
 
     // Get Hessian (inverse of error matrix)
     let hessian = match mat.clone().try_inverse() {

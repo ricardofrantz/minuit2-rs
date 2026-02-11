@@ -1,5 +1,5 @@
-use crate::precision::MnMachinePrecision;
 use super::ParameterTransform;
+use crate::precision::MnMachinePrecision;
 
 /// Square-root transform for upper-bounded parameters.
 ///
@@ -23,11 +23,7 @@ impl ParameterTransform for SqrtUpTransform {
     fn ext2int(&self, value: f64, upper: f64, _lower: f64, prec: &MnMachinePrecision) -> f64 {
         let yy = upper - value + 1.0;
         let yy2 = yy * yy - 1.0;
-        if yy2 < prec.eps2() {
-            0.0
-        } else {
-            yy2.sqrt()
-        }
+        if yy2 < prec.eps2() { 0.0 } else { yy2.sqrt() }
     }
 
     fn dint2ext(&self, value: f64, _upper: f64, _lower: f64) -> f64 {
@@ -48,7 +44,10 @@ mod tests {
         for &ext in &[9.0, 5.0, -100.0] {
             let int = t.ext2int(ext, hi, f64::NEG_INFINITY, &prec);
             let back = t.int2ext(int, hi, f64::NEG_INFINITY);
-            assert!((back - ext).abs() < 1e-10, "roundtrip failed for {ext}: got {back}");
+            assert!(
+                (back - ext).abs() < 1e-10,
+                "roundtrip failed for {ext}: got {back}"
+            );
         }
     }
 

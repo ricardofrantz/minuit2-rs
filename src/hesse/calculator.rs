@@ -10,7 +10,7 @@
 
 use nalgebra::{DMatrix, DVector};
 
-use crate::minimum::error::{MinimumError, ErrorMatrixStatus};
+use crate::minimum::error::{ErrorMatrixStatus, MinimumError};
 use crate::minimum::gradient::FunctionGradient;
 use crate::minimum::state::MinimumState;
 use crate::mn_fcn::MnFcn;

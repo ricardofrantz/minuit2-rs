@@ -4,9 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 use std::collections::{HashMap, HashSet};
 
-use crate::{
-    FCN, FunctionMinimum, MnContours, MnHesse, MnMigrad, MnMinos, MnScan, MnSimplex,
-};
+use crate::{FCN, FunctionMinimum, MnContours, MnHesse, MnMigrad, MnMinos, MnScan, MnSimplex};
 
 // ============================================================================
 // FCN Wrapper
@@ -139,8 +137,12 @@ impl Minuit {
                     let l = tuple.get_item(0)?.extract::<Option<f64>>()?;
                     let u = tuple.get_item(1)?.extract::<Option<f64>>()?;
                     match (l, u) {
-                        (Some(low), Some(up)) => { self.limits.insert(name, (low, up)); },
-                        _ => { self.limits.remove(&name); }
+                        (Some(low), Some(up)) => {
+                            self.limits.insert(name, (low, up));
+                        }
+                        _ => {
+                            self.limits.remove(&name);
+                        }
                     }
                 }
             }
@@ -194,13 +196,16 @@ impl Minuit {
 
     #[getter]
     fn get_global_cc(&self) -> Option<Vec<f64>> {
-        self.last_minimum.as_ref()
+        self.last_minimum
+            .as_ref()
             .and_then(|m| m.user_state().global_cc())
             .map(|s| s.to_vec())
     }
 
     fn migrad(&mut self, py: Python<'_>) -> PyResult<()> {
-        let fcn = PythonFCN { fcn: self.fcn.clone_ref(py) };
+        let fcn = PythonFCN {
+            fcn: self.fcn.clone_ref(py),
+        };
         let minimizer = self.build_migrad();
         let result = minimizer.minimize(&fcn);
         self.update_state_from_result(&result);
@@ -209,7 +214,9 @@ impl Minuit {
     }
 
     fn simplex(&mut self, py: Python<'_>) -> PyResult<()> {
-        let fcn = PythonFCN { fcn: self.fcn.clone_ref(py) };
+        let fcn = PythonFCN {
+            fcn: self.fcn.clone_ref(py),
+        };
         let minimizer = self.build_simplex();
         let result = minimizer.minimize(&fcn);
         self.update_state_from_result(&result);
@@ -219,7 +226,9 @@ impl Minuit {
 
     fn hesse(&mut self, py: Python<'_>) -> PyResult<()> {
         if let Some(min) = &self.last_minimum {
-            let fcn = PythonFCN { fcn: self.fcn.clone_ref(py) };
+            let fcn = PythonFCN {
+                fcn: self.fcn.clone_ref(py),
+            };
             let mut hesse = MnHesse::new().with_strategy(self.strategy);
             if let Some(max) = self.max_calls {
                 hesse = hesse.with_max_calls(max);
@@ -229,13 +238,17 @@ impl Minuit {
             self.last_minimum = Some(result);
             Ok(())
         } else {
-            Err(pyo3::exceptions::PyRuntimeError::new_err("Run migrad/simplex first"))
+            Err(pyo3::exceptions::PyRuntimeError::new_err(
+                "Run migrad/simplex first",
+            ))
         }
     }
 
     fn minos(&mut self, py: Python<'_>) -> PyResult<HashMap<String, HashMap<String, f64>>> {
         if let Some(min) = &self.last_minimum {
-            let fcn = PythonFCN { fcn: self.fcn.clone_ref(py) };
+            let fcn = PythonFCN {
+                fcn: self.fcn.clone_ref(py),
+            };
             let minos = MnMinos::new(&fcn, min);
             let mut results = HashMap::new();
             for (i, name) in self.names.iter().enumerate() {
@@ -249,35 +262,64 @@ impl Minuit {
             }
             Ok(results)
         } else {
-            Err(pyo3::exceptions::PyRuntimeError::new_err("Run migrad/simplex first"))
+            Err(pyo3::exceptions::PyRuntimeError::new_err(
+                "Run migrad/simplex first",
+            ))
         }
     }
 
-    fn scan(&self, py: Python<'_>, param: String, nsteps: usize, low: f64, high: f64) -> PyResult<Vec<(f64, f64)>> {
+    fn scan(
+        &self,
+        py: Python<'_>,
+        param: String,
+        nsteps: usize,
+        low: f64,
+        high: f64,
+    ) -> PyResult<Vec<(f64, f64)>> {
         if let Some(min) = &self.last_minimum {
-            let fcn = PythonFCN { fcn: self.fcn.clone_ref(py) };
+            let fcn = PythonFCN {
+                fcn: self.fcn.clone_ref(py),
+            };
             let scan = MnScan::new(&fcn, min);
             if let Some(idx) = self.names.iter().position(|n| *n == param) {
                 Ok(scan.scan(idx, nsteps, low, high))
             } else {
-                Err(pyo3::exceptions::PyValueError::new_err("Parameter not found"))
+                Err(pyo3::exceptions::PyValueError::new_err(
+                    "Parameter not found",
+                ))
             }
         } else {
-            Err(pyo3::exceptions::PyRuntimeError::new_err("Run migrad/simplex first"))
+            Err(pyo3::exceptions::PyRuntimeError::new_err(
+                "Run migrad/simplex first",
+            ))
         }
     }
 
-    fn contour(&self, py: Python<'_>, par_x: String, par_y: String, npoints: usize) -> PyResult<Vec<(f64, f64)>> {
+    fn contour(
+        &self,
+        py: Python<'_>,
+        par_x: String,
+        par_y: String,
+        npoints: usize,
+    ) -> PyResult<Vec<(f64, f64)>> {
         if let Some(min) = &self.last_minimum {
-            let fcn = PythonFCN { fcn: self.fcn.clone_ref(py) };
+            let fcn = PythonFCN {
+                fcn: self.fcn.clone_ref(py),
+            };
             let contours = MnContours::new(&fcn, min).with_strategy(self.strategy);
-            let idx_x = self.names.iter().position(|n| *n == par_x)
-                .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("Parameter X not found"))?;
-            let idx_y = self.names.iter().position(|n| *n == par_y)
-                .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("Parameter Y not found"))?;
+            let idx_x =
+                self.names.iter().position(|n| *n == par_x).ok_or_else(|| {
+                    pyo3::exceptions::PyValueError::new_err("Parameter X not found")
+                })?;
+            let idx_y =
+                self.names.iter().position(|n| *n == par_y).ok_or_else(|| {
+                    pyo3::exceptions::PyValueError::new_err("Parameter Y not found")
+                })?;
             Ok(contours.points(idx_x, idx_y, npoints))
         } else {
-            Err(pyo3::exceptions::PyRuntimeError::new_err("Run migrad/simplex first"))
+            Err(pyo3::exceptions::PyRuntimeError::new_err(
+                "Run migrad/simplex first",
+            ))
         }
     }
 }

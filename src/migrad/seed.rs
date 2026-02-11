@@ -7,7 +7,9 @@
 use nalgebra::{DMatrix, DVector};
 
 use crate::fcn::FCNGradient;
-use crate::gradient::{AnalyticalGradientCalculator, InitialGradientCalculator, Numerical2PGradientCalculator};
+use crate::gradient::{
+    AnalyticalGradientCalculator, InitialGradientCalculator, Numerical2PGradientCalculator,
+};
 use crate::minimum::error::MinimumError;
 use crate::minimum::parameters::MinimumParameters;
 use crate::minimum::seed::MinimumSeed;
@@ -48,11 +50,7 @@ impl MigradSeedGenerator {
         let mut v0 = DMatrix::zeros(n, n);
         for i in 0..n {
             let g2i = gradient.g2()[i];
-            v0[(i, i)] = if g2i > eps2 {
-                1.0 / g2i
-            } else {
-                1.0
-            };
+            v0[(i, i)] = if g2i > eps2 { 1.0 / g2i } else { 1.0 };
         }
 
         let dcovar = 1.0; // approximate: initial V is rough
@@ -94,11 +92,7 @@ impl MigradSeedGenerator {
         let mut v0 = DMatrix::zeros(n, n);
         for i in 0..n {
             let g2i = gradient.g2()[i];
-            v0[(i, i)] = if g2i > eps2 {
-                1.0 / g2i
-            } else {
-                1.0
-            };
+            v0[(i, i)] = if g2i > eps2 { 1.0 / g2i } else { 1.0 };
         }
 
         let dcovar = 1.0; // approximate: initial V is rough

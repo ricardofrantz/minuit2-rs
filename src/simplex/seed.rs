@@ -44,11 +44,7 @@ impl SimplexSeedGenerator {
         let eps2 = trafo.precision().eps2();
         for i in 0..n {
             let g2i = gradient.g2()[i];
-            diag[(i, i)] = if g2i.abs() > eps2 {
-                1.0 / g2i
-            } else {
-                1.0
-            };
+            diag[(i, i)] = if g2i.abs() > eps2 { 1.0 / g2i } else { 1.0 };
         }
 
         let error = MinimumError::new(diag, 1.0);

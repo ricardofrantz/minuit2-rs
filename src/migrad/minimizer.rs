@@ -3,13 +3,13 @@
 //! Replaces VariableMetricMinimizer.h. Orchestrates the Migrad minimization
 //! by generating the seed, then running the VariableMetricBuilder loop.
 
+use super::builder::VariableMetricBuilder;
+use super::seed::MigradSeedGenerator;
 use crate::fcn::FCNGradient;
 use crate::minimum::FunctionMinimum;
 use crate::mn_fcn::MnFcn;
 use crate::strategy::MnStrategy;
 use crate::user_transformation::MnUserTransformation;
-use super::builder::VariableMetricBuilder;
-use super::seed::MigradSeedGenerator;
 
 pub struct VariableMetricMinimizer;
 
@@ -77,12 +77,7 @@ impl VariableMetricMinimizer {
 
         // Run variable-metric iteration with analytical gradient calculator
         let states = VariableMetricBuilder::minimum_with_gradient(
-            &mn_fcn,
-            fcn,
-            &seed,
-            strategy,
-            maxfcn,
-            edmval,
+            &mn_fcn, fcn, &seed, strategy, maxfcn, edmval,
         );
 
         // Check outcome
