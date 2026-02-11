@@ -9,18 +9,84 @@ Target compatibility baseline for verification work:
 - Scope: **Minuit2 only** (`math/minuit2`), not the broader ROOT framework layers.
 
 Compatibility snapshot (2026-02-11, differential harness):
-- pass: `4`
+- pass: `10`
 - warn: `2`
 - fail: `0`
 - Details: `reports/verification/diff_summary.md`
 - Claim scorecard: `reports/verification/scorecard.md`
 - Legacy C++ executed-surface coverage: `reports/verification/reference_coverage/summary.md`
 
+Verification snapshot (2026-02-11, ROOT `v6-36-08` baseline):
+- Differential workloads: `12` (`pass=10`, `warn=2`, `fail=0`)
+- Traceability matrix: `415` symbols (`implemented=303`, `waived=112`, `unresolved=0`)
+- Rust line coverage: `73.12%` (`--no-default-features`), `69.51%` (`--all-features`)
+- Reference C++ executed-surface coverage: `618 / 1840` functions (`33.59%`) and `48.96%` file line coverage
+- Executed-surface unmapped gaps: `P0=0`, `P1=48`, `P2=425` (`strict gate: FAIL`, non-regression gate: PASS)
+
+Verification claim status:
+- We **can** claim numerical parity on the covered differential workloads (`fail=0`).
+- We **can** claim zero known P0 gaps in the current parity/traceability gates.
+- We **cannot** currently claim full 1:1 functional coverage or “100% verifiable coverage”.
+  Current blocker: executed-surface strict gate requires `P0=0` and `P1=0`, but current `P1=48`.
+
+Recent verification burn-down commits:
+- `1306127` — expanded verification workloads and added executed-surface gate.
+- `15cada5` — reduced executed-surface false positives and rebaselined gaps.
+- `3de1c79` — burned down matrix-heavy executed-surface P1 gaps.
+- `93b45c2` — tightened executed-surface mapping and reduced P1 to 48.
+
 One-command reproducible verification (ROOT `v6-36-08` baseline):
 
 ```bash
 scripts/run_full_verification.sh v6-36-08
 ```
+
+## Verification Guide For Future Developers
+
+This section is intended to be operational, not marketing. It documents what is proven today, what is still open, and how to continue burn-down work safely.
+
+What is currently high-confidence:
+- Numerical correctness on the covered workload suite: `reports/verification/diff_summary.md` shows `fail=0` across 12 ROOT-vs-Rust differential workloads.
+- Symbol-level parity gate is clean: `reports/verification/traceability_summary.md` shows `unresolved=0`.
+- No known high-severity parity regressions in claim gates: `reports/verification/scorecard.md` reports ROOT P0 gaps `0`.
+
+What is currently not perfect:
+- Executed-surface strict completeness is not met. `reports/verification/executed_surface_mapping.md` currently reports `P0=0`, `P1=48`, `P2=425`, so strict gate (`P0==0 && P1==0`) fails.
+- Differential warnings remain in NFCN divergence for:
+  - `quadratic3_fixx_migrad`
+  - `quadratic3_fixx_hesse`
+- Benchmark evidence does not show blanket speedups. `reports/benchmarks/benchmark_baseline.md` shows scan-parallel overhead on small scans (`0.07x` speedup ratio for the benchmarked case).
+
+How to interpret executed-surface priorities:
+- `P0`: unresolved/high-risk mapping issue; treat as release-blocking regression.
+- `P1`: missing mapping for executed upstream functions; typically alias drift, API-shape drift, or incomplete parity mapping.
+- `P2`: lower-priority/waived categories (intentional architectural replacements, out-of-scope, or known tooling limitations).
+
+Why some large gap files are not immediate blockers:
+- `inc/Minuit2/MnPrint.h` and `src/MnPrint.cxx`: logging architecture was intentionally reshaped in Rust.
+- `inc/Minuit2/MnMatrix.h` and `src/MnMatrix.cxx`: matrix kernels are represented via `nalgebra`-backed Rust structures instead of 1:1 symbol clones.
+- `inc/ROOT/span.hxx` and `src/MPIProcess.*`: treated as architectural/out-of-scope in current waiver policy.
+
+Current `P1` concentration (use this to prioritize burn-down):
+- `inc/Minuit2/MinimumSeed.h` (`5`)
+- `inc/Minuit2/FunctionGradient.h` (`4`)
+- `inc/Minuit2/MnUserParameterState.h` + `src/MnUserParameterState.cxx` (`8` combined)
+- `inc/Minuit2/MnUserParameters.h` + `src/MnUserParameters.cxx` (`5` combined)
+- `inc/Minuit2/MnUserTransformation.h` + `src/MnUserTransformation.cxx` (`6` combined)
+
+Recommended burn-down workflow:
+1. Run `scripts/run_full_verification.sh v6-36-08` and confirm non-regression gates pass before editing mappings.
+2. Inspect `reports/verification/executed_surface_gaps.csv`, sorted by `gap_priority` then `call_count`.
+3. For true API equivalences, add mapping/alias improvements in the parity + traceability pipeline, not ad-hoc waivers.
+4. For intentional design differences, add explicit waiver rules with rationale in `verification/traceability/waiver_rules.csv`.
+5. Re-run executed-surface generation and gate checks:
+   - `python3 scripts/generate_executed_surface_mapping.py`
+   - `python3 scripts/check_executed_surface_gate.py --mode non-regression`
+   - `python3 scripts/check_executed_surface_gate.py --mode strict`
+6. Only update `verification/traceability/executed_surface_gaps_baseline.csv` after review of why deltas are valid.
+
+Hard claim boundary (do not overstate):
+- Until executed-surface strict gate is green (`P0=0`, `P1=0`) and differential warnings are resolved, do not claim full 1:1 functional coverage or 100% verifiable equivalence.
 
 ## Features
 
