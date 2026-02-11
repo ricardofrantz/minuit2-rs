@@ -121,24 +121,24 @@ def strip_templates(text: str) -> str:
         out = new
 
 
+def canonical_symbol(text: str) -> str:
+    out = strip_templates(text).strip().replace(" ", "")
+    if out.startswith("operator"):
+        if out.startswith("operator()"):
+            return "operator()"
+        m = re.match(r"operator[^\s(]*", out)
+        return m.group(0) if m else "operator"
+    return out
+
+
 def extract_symbol_info(demangled: str) -> SymbolInfo:
-    parts = demangled.split("::")
+    signature_prefix = demangled.strip().split("(", 1)[0].strip()
+    parts = [p for p in signature_prefix.split("::") if p]
     if not parts:
         return SymbolInfo(symbol=demangled, class_name="", is_constructor=False, is_destructor=False, is_operator=False)
 
-    tail = parts[-1].strip()
-    class_name = strip_templates(parts[-2].strip()) if len(parts) >= 2 else ""
-    class_name = class_name.replace(" ", "")
-
-    if tail.startswith("operator()"):
-        symbol = "operator()"
-    elif tail.startswith("operator"):
-        m = re.match(r"operator[^\s(]*", tail)
-        symbol = m.group(0) if m else "operator"
-    else:
-        symbol = tail.split("(", 1)[0].strip()
-
-    symbol = strip_templates(symbol).replace(" ", "")
+    symbol = canonical_symbol(parts[-1])
+    class_name = canonical_symbol(parts[-2]) if len(parts) >= 2 else ""
     is_operator = symbol.startswith("operator")
     is_constructor = bool(class_name) and symbol == class_name
     is_destructor = bool(class_name) and symbol == f"~{class_name}"
@@ -173,6 +173,18 @@ def rank_status(rows: list[dict[str, str]]) -> str:
     if "waived" in statuses:
         return "waived"
     return "missing"
+
+
+def file_is_low_priority_waived(file_rows: list[dict[str, str]]) -> bool:
+    if not file_rows:
+        return False
+    for row in file_rows:
+        if row.get("effective_status", "").strip() != "waived":
+            return False
+        waiver_type = row.get("waiver_type", "").strip()
+        if waiver_type and waiver_type not in LOW_PRIORITY_WAIVERS:
+            return False
+    return True
 
 
 def classify_gap_priority(
@@ -233,6 +245,7 @@ def main() -> int:
         info = extract_symbol_info(demangled)
 
         upstream_file = normalize_upstream_file(row.get("file", ""))
+        file_rows = trace_by_file.get(upstream_file, [])
         key = (upstream_file, info.symbol)
         matches = trace_by_key.get(key, [])
 
@@ -240,16 +253,21 @@ def main() -> int:
             key_lower = (upstream_file, info.symbol.lower())
             matches = [
                 r
-                for r in trace_by_file.get(upstream_file, [])
+                for r in file_rows
                 if r.get("upstream_symbol", "").strip().replace(" ", "").lower() == key_lower[1]
             ]
+
+        # For files that are fully waived for low-priority architectural/intentional reasons
+        # (e.g. MnPrint), treat unmatched instantiations as waived at file level.
+        if not matches and file_is_low_priority_waived(file_rows):
+            matches = file_rows
 
         mapping_status = rank_status(matches)
         if mapping_status == "implemented":
             mapped_count += 1
             continue
 
-        priority = classify_gap_priority(mapping_status, info, matches, trace_by_file.get(upstream_file, []))
+        priority = classify_gap_priority(mapping_status, info, matches, file_rows)
         if priority:
             priority_counts[priority] += 1
             file_gap_counts[upstream_file] += 1
