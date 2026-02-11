@@ -1,0 +1,137 @@
+name: Scientific Demo Benchmark (Scheduled)
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+    inputs:
+      repeats:
+        description: "Measured repeats per batch"
+        required: true
+        default: "41"
+        type: string
+      warmups:
+        description: "Warmup repeats per batch"
+        required: true
+        default: "9"
+        type: string
+      bootstrap_iters:
+        description: "Bootstrap iterations"
+        required: true
+        default: "5000"
+        type: string
+      permutation_iters:
+        description: "Permutation-test iterations"
+        required: true
+        default: "10000"
+        type: string
+      batches:
+        description: "Interleaved batches"
+        required: true
+        default: "9"
+        type: string
+      trim_fraction:
+        description: "Trim fraction on each tail for robust stats"
+        required: true
+        default: "0.10"
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: scientific-demo-scheduled-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  benchmark-refresh:
+    name: Refresh scientific benchmark artifacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install matplotlib
+
+      - name: Fetch scientific demo data
+        run: scripts/fetch_scientific_demo_data.sh
+
+      - name: Run tests
+        run: cargo test --all-features
+        env:
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
+
+      - name: Run benchmark + regenerate figures
+        shell: bash
+        run: |
+          REPEATS="${{ github.event.inputs.repeats || '41' }}"
+          WARMUPS="${{ github.event.inputs.warmups || '9' }}"
+          BOOT_ITERS="${{ github.event.inputs.bootstrap_iters || '5000' }}"
+          PERM_ITERS="${{ github.event.inputs.permutation_iters || '10000' }}"
+          BATCHES="${{ github.event.inputs.batches || '9' }}"
+          TRIM="${{ github.event.inputs.trim_fraction || '0.10' }}"
+
+          # Hosted runners are noisy/shared; keep strict checks off for scheduled refresh.
+          bash examples/run_comparison.sh \
+            "${REPEATS}" \
+            "${WARMUPS}" \
+            "${BOOT_ITERS}" \
+            "${PERM_ITERS}" \
+            "${BATCHES}" \
+            "" \
+            "${TRIM}" \
+            "0"
+
+      - name: Upload benchmark artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: scientific-demo-scheduled-${{ github.run_id }}
+          path: |
+            examples/comparison.png
+            examples/output/comparison_timings.csv
+            examples/output/comparison_samples.csv
+            examples/output/comparison_environment.json
+
+      - name: Commit refreshed artifacts (main only)
+        if: ${{ github.ref == 'refs/heads/main' }}
+        shell: bash
+        run: |
+          if git diff --quiet -- \
+            examples/comparison.png \
+            examples/output/comparison_timings.csv \
+            examples/output/comparison_samples.csv \
+            examples/output/comparison_environment.json; then
+            echo "No benchmark artifact changes to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add examples/comparison.png
+          git add examples/output/comparison_timings.csv
+          git add examples/output/comparison_samples.csv
+          git add examples/output/comparison_environment.json
+
+          git commit -m "ci: scheduled refresh of scientific benchmark artifacts [skip ci]"
+          git push
