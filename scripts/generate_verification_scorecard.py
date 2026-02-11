@@ -38,6 +38,7 @@ ALL_COVERAGE_RAW_PATH = REPO_ROOT / "reports" / "coverage" / "all_features_cover
 BENCH_DEFAULT_RAW_PATH = REPO_ROOT / "reports" / "benchmarks" / "default_raw.txt"
 BENCH_PARALLEL_RAW_PATH = REPO_ROOT / "reports" / "benchmarks" / "parallel_raw.txt"
 REF_COVERAGE_MANIFEST_PATH = REPO_ROOT / "reports" / "verification" / "reference_coverage" / "manifest.json"
+EXEC_SURFACE_MANIFEST_PATH = REPO_ROOT / "reports" / "verification" / "executed_surface_manifest.json"
 OUT_MANIFEST_PATH = REPO_ROOT / "reports" / "verification" / "manifest.json"
 OUT_SCORECARD_PATH = REPO_ROOT / "reports" / "verification" / "scorecard.md"
 
@@ -165,6 +166,25 @@ def parse_reference_coverage_manifest(path: Path) -> dict[str, object] | None:
     }
 
 
+def parse_executed_surface_manifest(path: Path) -> dict[str, object] | None:
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text())
+    priority = data.get("priority_counts") or {}
+    gate = data.get("gate") or {}
+    return {
+        "executed_functions_total": int(data.get("executed_functions_total", 0)),
+        "mapped_implemented_total": int(data.get("mapped_implemented_total", 0)),
+        "unmapped_total": int(data.get("unmapped_total", 0)),
+        "priority_counts": {
+            "P0": int(priority.get("P0", 0)),
+            "P1": int(priority.get("P1", 0)),
+            "P2": int(priority.get("P2", 0)),
+        },
+        "gate_pass": bool(gate.get("pass", False)),
+    }
+
+
 def yes_no(flag: bool) -> str:
     return "YES" if flag else "NO"
 
@@ -177,6 +197,7 @@ def main() -> int:
     all_cov = parse_total_coverage(ALL_COVERAGE_RAW_PATH)
     p0_gap_count = parse_p0_gap_count(ROOT_TEST_STATUS_PATH)
     ref_cov = parse_reference_coverage_manifest(REF_COVERAGE_MANIFEST_PATH)
+    exec_surface = parse_executed_surface_manifest(EXEC_SURFACE_MANIFEST_PATH)
 
     bench_default = parse_benchmarks(BENCH_DEFAULT_RAW_PATH)
     bench_parallel = parse_benchmarks(BENCH_PARALLEL_RAW_PATH)
@@ -192,7 +213,8 @@ def main() -> int:
     differential_gate = diff_counts["fail"] == 0
     traceability_gate = trace_counts["unresolved"] == 0
     root_p0_gate = p0_gap_count == 0
-    full_1to1_gate = differential_gate and traceability_gate and root_p0_gate
+    executed_surface_gate = bool(exec_surface and exec_surface["gate_pass"])
+    full_1to1_gate = differential_gate and traceability_gate and root_p0_gate and executed_surface_gate
     full_100_verifiable = full_1to1_gate and diff_counts["warn"] == 0
 
     manifest = {
@@ -231,6 +253,7 @@ def main() -> int:
             "all_features": all_cov,
         },
         "reference_coverage": ref_cov,
+        "executed_surface": exec_surface,
         "benchmarks": {
             "scan_serial_default": scan_serial_default[1] if scan_serial_default else None,
             "scan_serial_parallel_feature": scan_serial_parallel[1] if scan_serial_parallel else None,
@@ -239,6 +262,7 @@ def main() -> int:
         },
         "claims": {
             "numerical_parity_on_covered_workloads": differential_gate,
+            "executed_surface_mapping_gate": executed_surface_gate,
             "full_1_to_1_functional_coverage_vs_reference": full_1to1_gate,
             "full_100_percent_verifiable_coverage": full_100_verifiable,
         },
@@ -280,6 +304,13 @@ def main() -> int:
             f"{ref_cov['functions_executed']}/{ref_cov['functions_in_scope']} functions "
             f"(**{ref_cov['function_coverage_pct']:.2f}%**) across `math/minuit2`"
         )
+    if exec_surface:
+        pc = exec_surface["priority_counts"]
+        lines.append(
+            "- Executed-surface unmapped gaps: "
+            f"P0={pc['P0']}, P1={pc['P1']}, P2={pc['P2']} "
+            f"(gate={yes_no(bool(exec_surface['gate_pass']))})"
+        )
     if scan_serial_default:
         lines.append(f"- Benchmark serial scan (`default`): **{scan_serial_default[1]}**")
     if scan_serial_parallel and scan_parallel_parallel:
@@ -307,6 +338,10 @@ def main() -> int:
         f"**{yes_no(root_p0_gate)}** |"
     )
     lines.append(
+        "| Executed-surface mapping completeness | `executed-surface P0/P1 == 0` | "
+        f"**{yes_no(executed_surface_gate)}** |"
+    )
+    lines.append(
         "| Full 1:1 functional coverage claim | all above gates true | "
         f"**{yes_no(full_1to1_gate)}** |"
     )
@@ -323,9 +358,11 @@ def main() -> int:
             lines.append(f"  - `{upstream_file}`: {count}")
     if not root_p0_gate:
         lines.append("- Known ROOT P0 test-port gap(s) remain; see `reports/verification/root_test_port_status.md`.")
+    if not executed_surface_gate:
+        lines.append("- Executed-surface mapping gate fails; see `reports/verification/executed_surface_mapping.md`.")
     if diff_counts["warn"] > 0:
         lines.append("- Differential warnings remain (NFCN divergence); see `reports/verification/diff_summary.md`.")
-    if traceability_gate and root_p0_gate and diff_counts["warn"] == 0:
+    if traceability_gate and root_p0_gate and executed_surface_gate and diff_counts["warn"] == 0:
         lines.append("- None.")
     lines.append("")
     lines.append("## Reproduce")
@@ -335,6 +372,8 @@ def main() -> int:
     lines.append("python3 scripts/compare_ref_vs_rust.py")
     lines.append("python3 scripts/generate_traceability_matrix.py")
     lines.append("python3 scripts/check_traceability_gate.py --mode non-regression")
+    lines.append("python3 scripts/generate_executed_surface_mapping.py")
+    lines.append("python3 scripts/check_executed_surface_gate.py --mode non-regression")
     lines.append("cargo test --no-default-features")
     lines.append("PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 cargo test --all-features")
     lines.append("cargo llvm-cov --no-default-features --summary-only > reports/coverage/core_coverage_raw.txt")

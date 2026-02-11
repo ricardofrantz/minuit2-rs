@@ -7,7 +7,7 @@ Reference commit: `a8ca1b23e38d7dbe0ff24027894ca0f2ad65f1bd`
 
 ## Status Counts
 
-- pass: **4**
+- pass: **10**
 - warn: **2**
 - fail: **0**
 
@@ -21,6 +21,12 @@ Reference commit: `a8ca1b23e38d7dbe0ff24027894ca0f2ad65f1bd`
 | `quadratic2_minos_p0` | `pass` | - | - |
 | `quadratic2_simplex` | `pass` | - | - |
 | `rosenbrock2_minimize` | `pass` | - | - |
+| `quadratic2_minos_p1` | `pass` | - | - |
+| `quadratic2_lower_limited_migrad` | `pass` | - | - |
+| `rosenbrock2_migrad_strategy2` | `pass` | - | - |
+| `quadratic2_scan_p0` | `pass` | - | - |
+| `quadratic2_contours_01` | `pass` | - | - |
+| `quadratic2_no_g2_migrad` | `pass` | - | - |
 
 ## Artifacts
 

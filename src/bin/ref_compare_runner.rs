@@ -1,4 +1,4 @@
-use minuit2::{FCN, FCNGradient, MnHesse, MnMinimize, MnMigrad, MnMinos, MnSimplex};
+use minuit2::{FCN, FCNGradient, MnContours, MnHesse, MnMinimize, MnMigrad, MnMinos, MnScan, MnSimplex};
 
 #[derive(Debug, Clone)]
 struct RunResult {
@@ -173,6 +173,35 @@ impl FCN for Quadratic2 {
     }
 }
 
+struct QuadraticNoG2;
+
+impl FCN for QuadraticNoG2 {
+    fn value(&self, p: &[f64]) -> f64 {
+        let (x, y) = (p[0], p[1]);
+        let dx = x - 1.0;
+        let dy = y + 2.0;
+        dx * dx + dy * dy
+    }
+
+    fn has_hessian(&self) -> bool {
+        true
+    }
+
+    fn hessian(&self, _p: &[f64]) -> Vec<f64> {
+        vec![2.0, 0.0, 2.0]
+    }
+
+    fn has_g2(&self) -> bool {
+        false
+    }
+}
+
+impl FCNGradient for QuadraticNoG2 {
+    fn gradient(&self, p: &[f64]) -> Vec<f64> {
+        vec![2.0 * (p[0] - 1.0), 2.0 * (p[1] + 2.0)]
+    }
+}
+
 fn run_quadratic3_fixx_migrad() -> RunResult {
     let f = Quadratic3;
     let min = MnMigrad::new()
@@ -228,6 +257,26 @@ fn run_quadratic2_minos_p0() -> RunResult {
     result
 }
 
+fn run_quadratic2_minos_p1() -> RunResult {
+    let f = Quadratic2;
+    let min = MnMigrad::new()
+        .add("x", 0.4, 0.1)
+        .add("y", -1.0, 0.1)
+        .tolerance(0.1)
+        .minimize(&f);
+    let min_h = MnHesse::new().calculate(&f, &min);
+    let me = MnMinos::new(&f, &min_h).minos_error(1);
+
+    let mut result = common_result("quadratic2_minos_p1", "migrad+hesse+minos", &min_h);
+    result.minos = Some(MinosResult {
+        valid: me.is_valid(),
+        parameter: me.parameter(),
+        lower: me.lower_error(),
+        upper: me.upper_error(),
+    });
+    result
+}
+
 fn run_quadratic2_simplex() -> RunResult {
     let f = Quadratic2;
     let min = MnSimplex::new()
@@ -248,6 +297,91 @@ fn run_rosenbrock2_minimize() -> RunResult {
     common_result("rosenbrock2_minimize", "minimize", &min)
 }
 
+fn run_quadratic2_limited_migrad() -> RunResult {
+    let f = Quadratic2;
+    let min = MnMigrad::new()
+        .add_limited("x", 0.4, 0.1, 0.0, 2.0)
+        .add_limited("y", -1.0, 0.1, -3.0, -1.0)
+        .tolerance(0.1)
+        .minimize(&f);
+    common_result("quadratic2_limited_migrad", "migrad", &min)
+}
+
+fn run_quadratic2_lower_limited_migrad() -> RunResult {
+    let f = Quadratic2;
+    let min = MnMigrad::new()
+        .add_lower_limited("x", 0.4, 0.1, 0.0)
+        .add_lower_limited("y", -1.0, 0.1, -2.5)
+        .tolerance(0.1)
+        .minimize(&f);
+    common_result("quadratic2_lower_limited_migrad", "migrad", &min)
+}
+
+fn run_quadratic2_upper_limited_migrad() -> RunResult {
+    let f = Quadratic2;
+    let min = MnMigrad::new()
+        .add_upper_limited("x", 0.4, 0.1, 1.8)
+        .add_upper_limited("y", -1.0, 0.1, -1.5)
+        .tolerance(0.1)
+        .minimize(&f);
+    common_result("quadratic2_upper_limited_migrad", "migrad", &min)
+}
+
+fn run_rosenbrock2_migrad_strategy2() -> RunResult {
+    let f = Rosenbrock2;
+    let min = MnMigrad::new()
+        .add("x", 0.0, 0.1)
+        .add("y", 0.0, 0.1)
+        .with_strategy(2)
+        .tolerance(0.1)
+        .minimize(&f);
+    common_result("rosenbrock2_migrad_strategy2", "migrad_s2", &min)
+}
+
+fn run_quadratic2_scan_p0() -> RunResult {
+    let f = Quadratic2;
+    let min = MnMigrad::new()
+        .add("x", 0.4, 0.1)
+        .add("y", -1.0, 0.1)
+        .tolerance(0.1)
+        .minimize(&f);
+    let _points = MnScan::new(&f, &min).scan(0, 61, 0.0, 0.0);
+    common_result("quadratic2_scan_p0", "migrad+scan", &min)
+}
+
+fn run_quadratic2_scan_p1_limited() -> RunResult {
+    let f = Quadratic2;
+    let min = MnMigrad::new()
+        .add_limited("x", 0.4, 0.1, 0.0, 2.0)
+        .add_limited("y", -1.0, 0.1, -3.0, -1.0)
+        .tolerance(0.1)
+        .minimize(&f);
+    let _points = MnScan::new(&f, &min).scan(1, 61, 0.0, 0.0);
+    common_result("quadratic2_scan_p1_limited", "migrad+scan", &min)
+}
+
+fn run_quadratic2_contours_01() -> RunResult {
+    let f = Quadratic2;
+    let min = MnMigrad::new()
+        .add("x", 0.4, 0.1)
+        .add("y", -1.0, 0.1)
+        .tolerance(0.1)
+        .minimize(&f);
+    let min_h = MnHesse::new().calculate(&f, &min);
+    let _points = MnContours::new(&f, &min_h).points(0, 1, 12);
+    common_result("quadratic2_contours_01", "migrad+hesse+contours", &min_h)
+}
+
+fn run_quadratic2_no_g2_migrad() -> RunResult {
+    let f = QuadraticNoG2;
+    let min = MnMigrad::new()
+        .add("x", 0.4, 0.1)
+        .add("y", -1.0, 0.1)
+        .tolerance(0.1)
+        .minimize_grad(&f);
+    common_result("quadratic2_no_g2_migrad", "migrad_no_g2", &min)
+}
+
 fn main() {
     let Some(workload) = parse_workload_arg() else {
         eprintln!("usage: cargo run --bin ref_compare_runner -- --workload <id>");
@@ -259,8 +393,17 @@ fn main() {
         "quadratic3_fixx_hesse" => run_quadratic3_fixx_hesse(),
         "rosenbrock2_migrad" => run_rosenbrock2_migrad(),
         "quadratic2_minos_p0" => run_quadratic2_minos_p0(),
+        "quadratic2_minos_p1" => run_quadratic2_minos_p1(),
         "quadratic2_simplex" => run_quadratic2_simplex(),
         "rosenbrock2_minimize" => run_rosenbrock2_minimize(),
+        "quadratic2_limited_migrad" => run_quadratic2_limited_migrad(),
+        "quadratic2_lower_limited_migrad" => run_quadratic2_lower_limited_migrad(),
+        "quadratic2_upper_limited_migrad" => run_quadratic2_upper_limited_migrad(),
+        "rosenbrock2_migrad_strategy2" => run_rosenbrock2_migrad_strategy2(),
+        "quadratic2_scan_p0" => run_quadratic2_scan_p0(),
+        "quadratic2_scan_p1_limited" => run_quadratic2_scan_p1_limited(),
+        "quadratic2_contours_01" => run_quadratic2_contours_01(),
+        "quadratic2_no_g2_migrad" => run_quadratic2_no_g2_migrad(),
         _ => {
             eprintln!("unknown workload: {workload}");
             std::process::exit(3);

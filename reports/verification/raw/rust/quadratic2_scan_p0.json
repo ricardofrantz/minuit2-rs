@@ -1,0 +1,30 @@
+{
+  "algorithm": "migrad+scan",
+  "covariance": [
+    [
+      1.00565681961128,
+      -0.03771213073568654
+    ],
+    [
+      -0.03771213073568654,
+      0.2514142049024563
+    ]
+  ],
+  "edm": 6.185755689671e-05,
+  "errors": [
+    1.002824421128285,
+    0.5014122105637798
+  ],
+  "fval": -0.6995269602637504,
+  "has_covariance": true,
+  "has_minos": false,
+  "minos": null,
+  "nfcn": 28,
+  "params": [
+    1.3127461826981874,
+    -2.0482092385769444
+  ],
+  "runner": "minuit2-rs",
+  "valid": true,
+  "workload": "quadratic2_scan_p0"
+}

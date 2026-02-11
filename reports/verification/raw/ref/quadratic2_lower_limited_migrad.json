@@ -1,0 +1,30 @@
+{
+  "algorithm": "migrad",
+  "covariance": [
+    [
+      1.0056826545186426,
+      -0.03771537903878407
+    ],
+    [
+      -0.03771537903878407,
+      0.25139688685351363
+    ]
+  ],
+  "edm": 1.190321186374297e-07,
+  "errors": [
+    0.9771509801785297,
+    0.47359375230939116
+  ],
+  "fval": -0.6995599061088412,
+  "has_covariance": true,
+  "has_minos": false,
+  "minos": null,
+  "nfcn": 45,
+  "params": [
+    1.3070916392122705,
+    -2.0489034012021565
+  ],
+  "runner": "root-minuit2",
+  "valid": true,
+  "workload": "quadratic2_lower_limited_migrad"
+}

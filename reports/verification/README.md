@@ -15,6 +15,8 @@ Canonical reference target:
 - ROOT build/bootstrap script: `scripts/build_root_reference_runner.sh`
 - Traceability matrix generator: `scripts/generate_traceability_matrix.py`
 - Traceability gate checker: `scripts/check_traceability_gate.py`
+- Executed-surface mapping generator: `scripts/generate_executed_surface_mapping.py`
+- Executed-surface gate checker: `scripts/check_executed_surface_gate.py`
 - Claim scorecard generator: `scripts/generate_verification_scorecard.py`
 
 ## Reproduce
@@ -27,6 +29,9 @@ scripts/build_root_reference_runner.sh v6-36-08
 python3 scripts/compare_ref_vs_rust.py
 python3 scripts/generate_traceability_matrix.py
 python3 scripts/check_traceability_gate.py --mode non-regression
+python3 scripts/generate_reference_coverage.py --root-tag v6-36-08
+python3 scripts/generate_executed_surface_mapping.py
+python3 scripts/check_executed_surface_gate.py --mode non-regression
 python3 scripts/generate_verification_scorecard.py
 ```
 
@@ -41,28 +46,34 @@ python3 scripts/generate_verification_scorecard.py
 - `reports/verification/known_differences.md`
 - `reports/verification/traceability_matrix.csv`
 - `reports/verification/traceability_summary.md`
+- `reports/verification/reference_coverage/summary.md`
+- `reports/verification/executed_surface_mapping.md`
+- `reports/verification/executed_surface_gaps.csv`
+- `reports/verification/executed_surface_manifest.json`
 - `verification/traceability/traceability_baseline.csv`
+- `verification/traceability/executed_surface_gaps_baseline.csv`
 - `verification/traceability/waivers.csv`
 
 ## Current snapshot
 
 From latest run in this repo:
-- pass: 4
+- pass: 10
 - warn: 2
 - fail: 0
 
-Current workload count: 6.
+Current workload count: 12.
 
 Correctness gates currently pass for all workloads; warnings are NFCN-efficiency deltas only.
 
 This is a real, reproducible differential gate. It currently demonstrates correctness parity on the covered workloads, with remaining call-count efficiency differences.
 
 Traceability status snapshot:
-- implemented: 232
-- waived: 105
-- unresolved: 78
+- implemented: 303
+- waived: 112
+- unresolved: 0
 
 Claim snapshot:
 - numerical parity on covered workloads: **YES**
+- executed-surface mapping completeness (P0/P1): **NO**
 - full 1:1 functional coverage claim: **NO**
 - full 100% verifiable coverage claim: **NO**

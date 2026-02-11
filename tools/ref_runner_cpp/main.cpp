@@ -1,11 +1,14 @@
 #include <Minuit2/FCNBase.h>
 #include <Minuit2/FunctionMinimum.h>
 #include <Minuit2/MinosError.h>
+#include <Minuit2/MnContours.h>
 #include <Minuit2/MnHesse.h>
 #include <Minuit2/MnMinimize.h>
 #include <Minuit2/MnMigrad.h>
 #include <Minuit2/MnMinos.h>
+#include <Minuit2/MnScan.h>
 #include <Minuit2/MnSimplex.h>
+#include <Minuit2/MnStrategy.h>
 #include <Minuit2/MnUserCovariance.h>
 #include <Minuit2/MnUserParameterState.h>
 #include <Minuit2/MnUserParameters.h>
@@ -20,11 +23,14 @@
 using ROOT::Minuit2::FCNBase;
 using ROOT::Minuit2::FunctionMinimum;
 using ROOT::Minuit2::MinosError;
+using ROOT::Minuit2::MnContours;
 using ROOT::Minuit2::MnHesse;
 using ROOT::Minuit2::MnMinimize;
 using ROOT::Minuit2::MnMigrad;
 using ROOT::Minuit2::MnMinos;
+using ROOT::Minuit2::MnScan;
 using ROOT::Minuit2::MnSimplex;
+using ROOT::Minuit2::MnStrategy;
 using ROOT::Minuit2::MnUserCovariance;
 using ROOT::Minuit2::MnUserParameterState;
 using ROOT::Minuit2::MnUserParameters;
@@ -82,6 +88,39 @@ public:
       const double dy = y + 2.0;
       return dx * dx + 4.0 * dy * dy + 0.3 * x * y;
    }
+
+   double Up() const override { return 1.0; }
+};
+
+class QuadraticNoG2 final : public FCNBase {
+public:
+   double operator()(std::vector<double> const &p) const override
+   {
+      const double x = p.at(0);
+      const double y = p.at(1);
+      const double dx = x - 1.0;
+      const double dy = y + 2.0;
+      return dx * dx + dy * dy;
+   }
+
+   bool HasGradient() const override { return true; }
+
+   std::vector<double> Gradient(std::vector<double> const &p) const override
+   {
+      return {2.0 * (p.at(0) - 1.0), 2.0 * (p.at(1) + 2.0)};
+   }
+
+   bool HasHessian() const override { return true; }
+
+   std::vector<double> Hessian(std::vector<double> const &) const override
+   {
+      // Packed upper triangle of 2x2 identity-scaled Hessian.
+      return {2.0, 0.0, 2.0};
+   }
+
+   bool HasG2() const override { return false; }
+
+   std::vector<double> G2(std::vector<double> const &) const override { return {}; }
 
    double Up() const override { return 1.0; }
 };
@@ -278,6 +317,33 @@ RunResult run_quadratic2_minos_p0()
    return result;
 }
 
+RunResult run_quadratic2_minos_p1()
+{
+   Quadratic2 fcn;
+   MnUserParameters upar;
+   upar.Add("x", 0.4, 0.1);
+   upar.Add("y", -1.0, 0.1);
+
+   MnMigrad migrad(fcn, upar);
+   FunctionMinimum minimum = migrad();
+   MnHesse hesse;
+   hesse(fcn, minimum);
+
+   MnMinos minos(fcn, minimum);
+   MinosError me = minos.Minos(1);
+
+   RunResult result;
+   result.workload = "quadratic2_minos_p1";
+   result.algorithm = "migrad+hesse+minos";
+   fill_common(result, minimum);
+   result.has_minos = true;
+   result.minos_valid = me.IsValid();
+   result.minos_parameter = me.Parameter();
+   result.minos_lower = me.Lower();
+   result.minos_upper = me.Upper();
+   return result;
+}
+
 RunResult run_quadratic2_simplex()
 {
    Quadratic2 fcn;
@@ -308,6 +374,157 @@ RunResult run_rosenbrock2_minimize()
    RunResult result;
    result.workload = "rosenbrock2_minimize";
    result.algorithm = "minimize";
+   fill_common(result, minimum);
+   return result;
+}
+
+RunResult run_quadratic2_limited_migrad()
+{
+   Quadratic2 fcn;
+   MnUserParameters upar;
+   upar.Add("x", 0.4, 0.1, 0.0, 2.0);
+   upar.Add("y", -1.0, 0.1, -3.0, -1.0);
+
+   MnMigrad migrad(fcn, upar);
+   FunctionMinimum minimum = migrad();
+
+   RunResult result;
+   result.workload = "quadratic2_limited_migrad";
+   result.algorithm = "migrad";
+   fill_common(result, minimum);
+   return result;
+}
+
+RunResult run_quadratic2_lower_limited_migrad()
+{
+   Quadratic2 fcn;
+   MnUserParameters upar;
+   upar.Add("x", 0.4, 0.1);
+   upar.Add("y", -1.0, 0.1);
+   upar.SetLowerLimit(0, 0.0);
+   upar.SetLowerLimit(1, -2.5);
+
+   MnMigrad migrad(fcn, upar);
+   FunctionMinimum minimum = migrad();
+
+   RunResult result;
+   result.workload = "quadratic2_lower_limited_migrad";
+   result.algorithm = "migrad";
+   fill_common(result, minimum);
+   return result;
+}
+
+RunResult run_quadratic2_upper_limited_migrad()
+{
+   Quadratic2 fcn;
+   MnUserParameters upar;
+   upar.Add("x", 0.4, 0.1);
+   upar.Add("y", -1.0, 0.1);
+   upar.SetUpperLimit(0, 1.8);
+   upar.SetUpperLimit(1, -1.5);
+
+   MnMigrad migrad(fcn, upar);
+   FunctionMinimum minimum = migrad();
+
+   RunResult result;
+   result.workload = "quadratic2_upper_limited_migrad";
+   result.algorithm = "migrad";
+   fill_common(result, minimum);
+   return result;
+}
+
+RunResult run_rosenbrock2_migrad_strategy2()
+{
+   Rosenbrock2 fcn;
+   MnUserParameters upar;
+   upar.Add("x", 0.0, 0.1);
+   upar.Add("y", 0.0, 0.1);
+
+   MnMigrad migrad(fcn, upar, MnStrategy(2));
+   FunctionMinimum minimum = migrad();
+
+   RunResult result;
+   result.workload = "rosenbrock2_migrad_strategy2";
+   result.algorithm = "migrad_s2";
+   fill_common(result, minimum);
+   return result;
+}
+
+RunResult run_quadratic2_scan_p0()
+{
+   Quadratic2 fcn;
+   MnUserParameters upar;
+   upar.Add("x", 0.4, 0.1);
+   upar.Add("y", -1.0, 0.1);
+
+   MnMigrad migrad(fcn, upar);
+   FunctionMinimum minimum = migrad();
+   MnScan scan(fcn, minimum.UserState());
+   auto points = scan.Scan(0, 61, 0.0, 0.0);
+   (void)points;
+
+   RunResult result;
+   result.workload = "quadratic2_scan_p0";
+   result.algorithm = "migrad+scan";
+   fill_common(result, minimum);
+   return result;
+}
+
+RunResult run_quadratic2_scan_p1_limited()
+{
+   Quadratic2 fcn;
+   MnUserParameters upar;
+   upar.Add("x", 0.4, 0.1, 0.0, 2.0);
+   upar.Add("y", -1.0, 0.1, -3.0, -1.0);
+
+   MnMigrad migrad(fcn, upar);
+   FunctionMinimum minimum = migrad();
+   MnScan scan(fcn, minimum.UserState());
+   auto points = scan.Scan(1, 61, 0.0, 0.0);
+   (void)points;
+
+   RunResult result;
+   result.workload = "quadratic2_scan_p1_limited";
+   result.algorithm = "migrad+scan";
+   fill_common(result, minimum);
+   return result;
+}
+
+RunResult run_quadratic2_contours_01()
+{
+   Quadratic2 fcn;
+   MnUserParameters upar;
+   upar.Add("x", 0.4, 0.1);
+   upar.Add("y", -1.0, 0.1);
+
+   MnMigrad migrad(fcn, upar);
+   FunctionMinimum minimum = migrad();
+   MnHesse hesse;
+   hesse(fcn, minimum);
+   MnContours contours(fcn, minimum);
+   auto points = contours(0, 1, 12);
+   (void)points;
+
+   RunResult result;
+   result.workload = "quadratic2_contours_01";
+   result.algorithm = "migrad+hesse+contours";
+   fill_common(result, minimum);
+   return result;
+}
+
+RunResult run_quadratic2_no_g2_migrad()
+{
+   QuadraticNoG2 fcn;
+   MnUserParameters upar;
+   upar.Add("x", 0.4, 0.1);
+   upar.Add("y", -1.0, 0.1);
+
+   MnMigrad migrad(fcn, upar);
+   FunctionMinimum minimum = migrad();
+
+   RunResult result;
+   result.workload = "quadratic2_no_g2_migrad";
+   result.algorithm = "migrad_no_g2";
    fill_common(result, minimum);
    return result;
 }
@@ -345,10 +562,28 @@ int main(int argc, char **argv)
       result = run_rosenbrock2_migrad();
    } else if (workload == "quadratic2_minos_p0") {
       result = run_quadratic2_minos_p0();
+   } else if (workload == "quadratic2_minos_p1") {
+      result = run_quadratic2_minos_p1();
    } else if (workload == "quadratic2_simplex") {
       result = run_quadratic2_simplex();
    } else if (workload == "rosenbrock2_minimize") {
       result = run_rosenbrock2_minimize();
+   } else if (workload == "quadratic2_limited_migrad") {
+      result = run_quadratic2_limited_migrad();
+   } else if (workload == "quadratic2_lower_limited_migrad") {
+      result = run_quadratic2_lower_limited_migrad();
+   } else if (workload == "quadratic2_upper_limited_migrad") {
+      result = run_quadratic2_upper_limited_migrad();
+   } else if (workload == "rosenbrock2_migrad_strategy2") {
+      result = run_rosenbrock2_migrad_strategy2();
+   } else if (workload == "quadratic2_scan_p0") {
+      result = run_quadratic2_scan_p0();
+   } else if (workload == "quadratic2_scan_p1_limited") {
+      result = run_quadratic2_scan_p1_limited();
+   } else if (workload == "quadratic2_contours_01") {
+      result = run_quadratic2_contours_01();
+   } else if (workload == "quadratic2_no_g2_migrad") {
+      result = run_quadratic2_no_g2_migrad();
    } else {
       std::cerr << "unknown workload: " << workload << "\n";
       return 3;

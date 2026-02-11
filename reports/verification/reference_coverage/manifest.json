@@ -7,13 +7,19 @@
     "rosenbrock2_migrad",
     "quadratic2_minos_p0",
     "quadratic2_simplex",
-    "rosenbrock2_minimize"
+    "rosenbrock2_minimize",
+    "quadratic2_minos_p1",
+    "quadratic2_lower_limited_migrad",
+    "rosenbrock2_migrad_strategy2",
+    "quadratic2_scan_p0",
+    "quadratic2_contours_01",
+    "quadratic2_no_g2_migrad"
   ],
   "counts": {
-    "functions_in_scope": 1716,
-    "functions_executed": 524,
-    "function_coverage_pct": 30.5361,
-    "line_coverage_pct": 41.6829
+    "functions_in_scope": 1840,
+    "functions_executed": 618,
+    "function_coverage_pct": 33.587,
+    "line_coverage_pct": 48.9611
   },
   "artifacts": {
     "executed_functions_csv": "/Users/rfrantz/Documents/projects/minuit2-rs/reports/verification/reference_coverage/executed_functions.csv",

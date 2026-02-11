@@ -69,6 +69,69 @@
         "cov_abs": 0.5,
         "nfcn_rel_warn": 0.7
       }
+    },
+    {
+      "id": "quadratic2_minos_p1",
+      "description": "Asymmetric Minos interval for parameter 1 after Migrad+Hesse.",
+      "tolerances": {
+        "fval_abs": 1e-8,
+        "edm_abs": 1e-6,
+        "param_abs": 1e-5,
+        "minos_abs": 2e-3,
+        "nfcn_rel_warn": 0.7
+      }
+    },
+    {
+      "id": "quadratic2_lower_limited_migrad",
+      "description": "Migrad on quadratic with lower limits to exercise bounded transforms.",
+      "tolerances": {
+        "fval_abs": 2e-7,
+        "edm_abs": 5e-6,
+        "param_abs": 7e-5,
+        "nfcn_rel_warn": 0.8
+      }
+    },
+    {
+      "id": "rosenbrock2_migrad_strategy2",
+      "description": "Rosenbrock Migrad using strategy=2 for deeper derivative checks.",
+      "tolerances": {
+        "fval_abs": 7e-5,
+        "edm_abs": 2e-4,
+        "param_abs": 8e-3,
+        "cov_abs": 0.8,
+        "nfcn_rel_warn": 0.8
+      }
+    },
+    {
+      "id": "quadratic2_scan_p0",
+      "description": "Migrad minimum followed by MnScan over parameter 0.",
+      "tolerances": {
+        "fval_abs": 1e-8,
+        "edm_abs": 5e-5,
+        "param_abs": 1e-5,
+        "nfcn_rel_warn": 0.8
+      }
+    },
+    {
+      "id": "quadratic2_contours_01",
+      "description": "Migrad+Hesse followed by MnContours (parameters 0,1).",
+      "tolerances": {
+        "fval_abs": 1e-8,
+        "edm_abs": 1e-6,
+        "param_abs": 1e-5,
+        "cov_abs": 2e-4,
+        "nfcn_rel_warn": 0.8
+      }
+    },
+    {
+      "id": "quadratic2_no_g2_migrad",
+      "description": "Analytical-gradient quadratic with Hessian available but no G2 support.",
+      "tolerances": {
+        "fval_abs": 1e-8,
+        "edm_abs": 1e-6,
+        "param_abs": 1e-5,
+        "nfcn_rel_warn": 0.8
+      }
     }
   ]
 }

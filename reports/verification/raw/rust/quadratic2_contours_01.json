@@ -1,0 +1,30 @@
+{
+  "algorithm": "migrad+hesse+contours",
+  "covariance": [
+    [
+      1.005656819610479,
+      -0.03771213073541486
+    ],
+    [
+      -0.03771213073541486,
+      0.25141420490261057
+    ]
+  ],
+  "edm": 3.30648776702e-05,
+  "errors": [
+    1.0028244211278856,
+    0.5014122105639337
+  ],
+  "fval": -0.6995269602637504,
+  "has_covariance": true,
+  "has_minos": false,
+  "minos": null,
+  "nfcn": 19,
+  "params": [
+    1.3127461826981874,
+    -2.0482092385769444
+  ],
+  "runner": "minuit2-rs",
+  "valid": true,
+  "workload": "quadratic2_contours_01"
+}
