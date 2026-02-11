@@ -224,7 +224,7 @@ impl MnMinimize {
 
         let migrad2 = Self::configure_migrad_from_params(
             MnMigrad::new().with_strategy(fallback_strategy),
-            &simplex_min.user_state().params(),
+            simplex_min.user_state().params(),
         )
         .max_fcn(max_fcn)
         .tolerance(self.tolerance);

@@ -84,11 +84,11 @@ impl<'a, F: FCN + ?Sized> MnParameterScan<'a, F> {
             })
             .collect();
 
-        if let Some((x_best, f_best)) = result.iter().copied().min_by(|a, b| a.1.total_cmp(&b.1)) {
-            if f_best < self.fval {
-                self.fval = f_best;
-                self.params.set_value(par, x_best);
-            }
+        if let Some((x_best, f_best)) = result.iter().copied().min_by(|a, b| a.1.total_cmp(&b.1))
+            && f_best < self.fval
+        {
+            self.fval = f_best;
+            self.params.set_value(par, x_best);
         }
 
         result

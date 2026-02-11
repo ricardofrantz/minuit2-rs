@@ -1,5 +1,3 @@
-#![cfg(feature = "python")]
-
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 use std::collections::{HashMap, HashSet};
@@ -132,17 +130,17 @@ impl Minuit {
             }
             if value.is_none() {
                 self.limits.remove(&name);
-            } else if let Ok(tuple) = value.cast::<PyTuple>() {
-                if tuple.len() == 2 {
-                    let l = tuple.get_item(0)?.extract::<Option<f64>>()?;
-                    let u = tuple.get_item(1)?.extract::<Option<f64>>()?;
-                    match (l, u) {
-                        (Some(low), Some(up)) => {
-                            self.limits.insert(name, (low, up));
-                        }
-                        _ => {
-                            self.limits.remove(&name);
-                        }
+            } else if let Ok(tuple) = value.cast::<PyTuple>()
+                && tuple.len() == 2
+            {
+                let l = tuple.get_item(0)?.extract::<Option<f64>>()?;
+                let u = tuple.get_item(1)?.extract::<Option<f64>>()?;
+                match (l, u) {
+                    (Some(low), Some(up)) => {
+                        self.limits.insert(name, (low, up));
+                    }
+                    _ => {
+                        self.limits.remove(&name);
                     }
                 }
             }
@@ -177,19 +175,19 @@ impl Minuit {
 
     #[getter]
     fn get_covariance(&self) -> Option<Vec<Vec<f64>>> {
-        if let Some(min) = &self.last_minimum {
-            if let Some(cov) = min.user_state().covariance() {
-                let n = cov.nrow();
-                let mut matrix = Vec::with_capacity(n);
-                for r in 0..n {
-                    let mut row = Vec::with_capacity(n);
-                    for c in 0..n {
-                        row.push(cov.get(r, c));
-                    }
-                    matrix.push(row);
+        if let Some(min) = &self.last_minimum
+            && let Some(cov) = min.user_state().covariance()
+        {
+            let n = cov.nrow();
+            let mut matrix = Vec::with_capacity(n);
+            for r in 0..n {
+                let mut row = Vec::with_capacity(n);
+                for c in 0..n {
+                    row.push(cov.get(r, c));
                 }
-                return Some(matrix);
+                matrix.push(row);
             }
+            return Some(matrix);
         }
         None
     }

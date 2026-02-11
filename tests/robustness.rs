@@ -41,7 +41,7 @@ fn high_dim_stress() {
 
     // Add 50 parameters: x0, x1, ...
     for i in 0..n {
-        builder = builder.add(&format!("x{}", i), i as f64, 0.1);
+        builder = builder.add(format!("x{}", i), i as f64, 0.1);
     }
 
     // Minimize sum(x_i^2)

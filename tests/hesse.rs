@@ -32,7 +32,7 @@ fn hesse_quadratic_errors() {
     let err_y = state.error("y").unwrap();
 
     assert!(
-        (err_x - 0.7071067811865476).abs() < 0.05,
+        (err_x - std::f64::consts::FRAC_1_SQRT_2).abs() < 0.05,
         "sigma_x should be ~0.707, got {err_x}"
     );
     assert!(
@@ -115,7 +115,7 @@ fn hesse_calculate_errors() {
     assert!(state.has_covariance());
     let err_x = state.error("x").unwrap();
     assert!(
-        (err_x - 0.7071067811865476).abs() < 0.05,
+        (err_x - std::f64::consts::FRAC_1_SQRT_2).abs() < 0.05,
         "sigma_x should be ~0.707, got {err_x}"
     );
 }

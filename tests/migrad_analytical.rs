@@ -147,6 +147,6 @@ fn migrad_analytical_with_bounds() {
     assert!(y.abs() < 0.1, "y should be small, got {}", y);
 
     // Check bounds are satisfied
-    assert!(x >= -1.0 && x <= 1.0, "x must be in [-1, 1], got {}", x);
-    assert!(y >= -2.0 && y <= 2.0, "y must be in [-2, 2], got {}", y);
+    assert!((-1.0..=1.0).contains(&x), "x must be in [-1, 1], got {}", x);
+    assert!((-2.0..=2.0).contains(&y), "y must be in [-2, 2], got {}", y);
 }
