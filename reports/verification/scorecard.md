@@ -1,7 +1,7 @@
 # Verification Scorecard (Claim-Oriented)
 
-- Generated at: `2026-02-11T13:50:21Z`
-- Rust commit: `13061276d56ce4027dd7de2db355f249a7718f51`
+- Generated at: `2026-02-11T13:54:44Z`
+- Rust commit: `15cada5a26e7cc080d11678cbd2b6cb03d94b7a3`
 - Reference repo: `https://github.com/root-project/root`
 - Reference subtree: `math/minuit2`
 - Reference tag: `v6-36-08`
@@ -14,7 +14,7 @@
 - Known ROOT P0 gaps: **0**
 - Coverage (line): `--no-default-features` **73.12%**, `--all-features` **69.51%**
 - Reference C++ executed-surface: 618/1840 functions (**33.59%**) across `math/minuit2`
-- Executed-surface unmapped gaps: P0=0, P1=204, P2=348 (gate=NO)
+- Executed-surface unmapped gaps: P0=0, P1=139, P2=411 (gate=NO)
 - Benchmark serial scan (`default`): **2.441 µs**
 - Benchmark scan in `parallel` feature run: serial=2.138 µs, parallel=28.89 µs
 - Scan speedup (`serial/parallel`, parallel feature run): **0.07x**

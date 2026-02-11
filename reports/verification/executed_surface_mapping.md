@@ -5,9 +5,9 @@ Join of reference executed C++ functions with traceability matrix mappings.
 ## Summary
 
 - Executed C++ functions: **618**
-- Mapped to implemented Rust symbols: **66**
-- Unmapped executed functions: **552**
-- Unmapped priority split: P0=0, P1=204, P2=348
+- Mapped to implemented Rust symbols: **68**
+- Unmapped executed functions: **550**
+- Unmapped priority split: P0=0, P1=139, P2=411
 - Gate (`P0 == 0 and P1 == 0`): **FAIL**
 - Coverage workloads used: **12**
 
@@ -23,7 +23,7 @@ Join of reference executed C++ functions with traceability matrix mappings.
 - `inc/Minuit2/MnMatrix.h`: 75
 - `inc/ROOT/span.hxx`: 22
 - `src/MnUserParameterState.cxx`: 22
-- `src/MnUserTransformation.cxx`: 21
+- `src/MnUserTransformation.cxx`: 19
 - `src/MnMatrix.cxx`: 14
 - `src/MnUserParameters.cxx`: 13
 - `src/MnPrint.cxx`: 9
@@ -60,23 +60,23 @@ Join of reference executed C++ functions with traceability matrix mappings.
 | P1 | `inc/Minuit2/MinuitParameter.h` | `GetName` | `missing` | 484 |
 | P1 | `inc/Minuit2/MnFcn.h` | `Fcn` | `missing` | 853 |
 | P1 | `inc/Minuit2/MnFcn.h` | `Trafo` | `missing` | 1334 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `A` | `missing` | 81 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `A` | `missing` | 484 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `A` | `missing` | 672 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `ABObj` | `missing` | 425 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `ABObj` | `missing` | 485 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `ABObj` | `missing` | 81 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `ABObj` | `missing` | 484 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `ABObj` | `missing` | 336 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `ABObj` | `missing` | 1732 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `ABProd` | `missing` | 336 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `ABSum` | `missing` | 81 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `ABSum` | `missing` | 484 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `Allocate` | `missing` | 9529 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `B` | `missing` | 81 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `B` | `missing` | 484 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `B` | `missing` | 1101 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `Data` | `missing` | 306 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `Data` | `missing` | 287 |
-| P1 | `inc/Minuit2/MnMatrix.h` | `Data` | `missing` | 2016 |
+| P1 | `inc/Minuit2/MnUserParameterState.h` | `IntCovariance` | `missing` | 32 |
+| P1 | `inc/Minuit2/MnUserParameterState.h` | `IntParameters` | `missing` | 38 |
+| P1 | `inc/Minuit2/MnUserParameterState.h` | `Parameters` | `missing` | 45 |
+| P1 | `inc/Minuit2/MnUserParameterState.h` | `Trafo` | `missing` | 128 |
+| P1 | `inc/Minuit2/MnUserParameters.h` | `Trafo` | `missing` | 417 |
+| P1 | `inc/Minuit2/MnUserTransformation.h` | `InitialParValues` | `missing` | 488 |
+| P1 | `inc/Minuit2/MnUserTransformation.h` | `Parameters` | `missing` | 94 |
+| P1 | `inc/Minuit2/MnUserTransformation.h` | `Precision` | `missing` | 553 |
+| P1 | `inc/Minuit2/VariableMetricBuilder.h` | `ErrorUpdator` | `missing` | 81 |
+| P1 | `inc/Minuit2/VariableMetricBuilder.h` | `Estimator` | `missing` | 81 |
+| P1 | `inc/ROOT/span.hxx` | `begin` | `missing` | 87 |
+| P1 | `inc/ROOT/span.hxx` | `begin` | `missing` | 1 |
+| P1 | `inc/ROOT/span.hxx` | `begin` | `missing` | 1 |
+| P1 | `inc/ROOT/span.hxx` | `begin` | `missing` | 55 |
+| P1 | `inc/ROOT/span.hxx` | `data` | `missing` | 6574 |
+| P1 | `inc/ROOT/span.hxx` | `end` | `missing` | 87 |
+| P1 | `inc/ROOT/span.hxx` | `end` | `missing` | 1 |
+| P1 | `inc/ROOT/span.hxx` | `end` | `missing` | 1 |
+| P1 | `inc/ROOT/span.hxx` | `end` | `missing` | 55 |
 

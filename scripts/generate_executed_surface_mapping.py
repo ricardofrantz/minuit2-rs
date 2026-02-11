@@ -28,6 +28,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EXECUTED_CSV = REPO_ROOT / "reports" / "verification" / "reference_coverage" / "executed_functions.csv"
 DEFAULT_TRACEABILITY_CSV = REPO_ROOT / "reports" / "verification" / "traceability_matrix.csv"
+DEFAULT_WAIVER_RULES_CSV = REPO_ROOT / "verification" / "traceability" / "waiver_rules.csv"
 DEFAULT_REF_COVERAGE_MANIFEST = REPO_ROOT / "reports" / "verification" / "reference_coverage" / "manifest.json"
 DEFAULT_OUT_MD = REPO_ROOT / "reports" / "verification" / "executed_surface_mapping.md"
 DEFAULT_OUT_GAPS_CSV = REPO_ROOT / "reports" / "verification" / "executed_surface_gaps.csv"
@@ -55,6 +56,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate executed-surface mapping and gap report")
     parser.add_argument("--executed-csv", default=str(DEFAULT_EXECUTED_CSV))
     parser.add_argument("--traceability-csv", default=str(DEFAULT_TRACEABILITY_CSV))
+    parser.add_argument("--waiver-rules-csv", default=str(DEFAULT_WAIVER_RULES_CSV))
     parser.add_argument("--reference-manifest", default=str(DEFAULT_REF_COVERAGE_MANIFEST))
     parser.add_argument("--out-md", default=str(DEFAULT_OUT_MD))
     parser.add_argument("--out-gaps-csv", default=str(DEFAULT_OUT_GAPS_CSV))
@@ -131,9 +133,65 @@ def canonical_symbol(text: str) -> str:
     return out
 
 
+def extract_function_prefix(demangled: str) -> str:
+    text = demangled.strip()
+    if not text:
+        return text
+
+    # Find the argument list by matching the final parenthesized segment from the right.
+    close_idx = text.rfind(")")
+    if close_idx == -1:
+        return text
+
+    depth = 0
+    open_idx = -1
+    for i in range(close_idx, -1, -1):
+        ch = text[i]
+        if ch == ")":
+            depth += 1
+        elif ch == "(":
+            depth -= 1
+            if depth == 0:
+                open_idx = i
+                break
+
+    if open_idx == -1:
+        return text
+    return text[:open_idx].strip()
+
+
+def split_cpp_scope(scope: str) -> list[str]:
+    parts: list[str] = []
+    chunk: list[str] = []
+    depth = 0
+    i = 0
+    while i < len(scope):
+        ch = scope[i]
+        if ch == "<":
+            depth += 1
+        elif ch == ">" and depth > 0:
+            depth -= 1
+
+        if ch == ":" and i + 1 < len(scope) and scope[i + 1] == ":" and depth == 0:
+            part = "".join(chunk).strip()
+            if part:
+                parts.append(part)
+            chunk = []
+            i += 2
+            continue
+
+        chunk.append(ch)
+        i += 1
+
+    tail = "".join(chunk).strip()
+    if tail:
+        parts.append(tail)
+    return parts
+
+
 def extract_symbol_info(demangled: str) -> SymbolInfo:
-    signature_prefix = demangled.strip().split("(", 1)[0].strip()
-    parts = [p for p in signature_prefix.split("::") if p]
+    signature_prefix = extract_function_prefix(demangled)
+    parts = split_cpp_scope(signature_prefix)
     if not parts:
         return SymbolInfo(symbol=demangled, class_name="", is_constructor=False, is_destructor=False, is_operator=False)
 
@@ -162,6 +220,50 @@ def index_traceability(
         by_key[(upstream_file, upstream_symbol)].append(row)
         by_file[upstream_file].append(row)
     return by_key, by_file
+
+
+def read_waiver_rules(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    out: list[dict[str, str]] = []
+    with path.open(newline="") as f:
+        reader = csv.DictReader(f)
+        required = {
+            "raw_status",
+            "rationale_contains",
+            "upstream_file_regex",
+            "upstream_symbol_regex",
+            "waiver_type",
+            "reason",
+        }
+        missing = required - set(reader.fieldnames or [])
+        if missing:
+            raise ValueError(f"waiver rules file missing columns: {sorted(missing)}")
+        for row in reader:
+            out.append({k: (row.get(k, "") or "").strip() for k in required})
+    return out
+
+
+def find_unmatched_waiver_rule(
+    rules: list[dict[str, str]],
+    upstream_file: str,
+    upstream_symbol: str,
+) -> dict[str, str] | None:
+    for rule in rules:
+        # Unmatched executed-surface gaps do not have a raw parity status/rationale context.
+        # Only dedicated file/symbol rules (with empty raw_status/rationale_contains) apply here.
+        if rule.get("raw_status", ""):
+            continue
+        if rule.get("rationale_contains", ""):
+            continue
+        file_re = rule.get("upstream_file_regex", "")
+        symbol_re = rule.get("upstream_symbol_regex", "")
+        if file_re and not re.search(file_re, upstream_file):
+            continue
+        if symbol_re and not re.search(symbol_re, upstream_symbol):
+            continue
+        return rule
+    return None
 
 
 def rank_status(rows: list[dict[str, str]]) -> str:
@@ -227,6 +329,7 @@ def main() -> int:
 
     executed_rows = read_csv(Path(args.executed_csv))
     traceability_rows = read_csv(Path(args.traceability_csv))
+    waiver_rules = read_waiver_rules(Path(args.waiver_rules_csv))
     trace_by_key, trace_by_file = index_traceability(traceability_rows)
     workload_ids = load_workloads_from_reference_manifest(Path(args.reference_manifest))
 
@@ -261,6 +364,18 @@ def main() -> int:
         # (e.g. MnPrint), treat unmatched instantiations as waived at file level.
         if not matches and file_is_low_priority_waived(file_rows):
             matches = file_rows
+        if not matches:
+            rule = find_unmatched_waiver_rule(waiver_rules, upstream_file, info.symbol)
+            if rule:
+                matches = [
+                    {
+                        "effective_status": "waived",
+                        "waiver_type": rule.get("waiver_type", ""),
+                        "rationale": rule.get("reason", ""),
+                        "rust_file": "",
+                        "rust_symbol": "",
+                    }
+                ]
 
         mapping_status = rank_status(matches)
         if mapping_status == "implemented":

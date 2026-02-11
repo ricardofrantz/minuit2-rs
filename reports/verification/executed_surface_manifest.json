@@ -1,11 +1,11 @@
 {
   "executed_functions_total": 618,
-  "mapped_implemented_total": 66,
-  "unmapped_total": 552,
+  "mapped_implemented_total": 68,
+  "unmapped_total": 550,
   "priority_counts": {
     "P0": 0,
-    "P1": 204,
-    "P2": 348
+    "P1": 139,
+    "P2": 411
   },
   "gate": {
     "rule": "P0 == 0 and P1 == 0",
