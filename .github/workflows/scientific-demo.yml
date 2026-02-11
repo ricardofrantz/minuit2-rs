@@ -1,0 +1,150 @@
+name: Scientific Demo Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner label"
+        required: true
+        default: "ubuntu-latest"
+        type: choice
+        options:
+          - ubuntu-latest
+          - self-hosted
+      repeats:
+        description: "Measured repeats per batch"
+        required: true
+        default: "41"
+        type: string
+      warmups:
+        description: "Warmup repeats per batch"
+        required: true
+        default: "9"
+        type: string
+      bootstrap_iters:
+        description: "Bootstrap iterations"
+        required: true
+        default: "5000"
+        type: string
+      permutation_iters:
+        description: "Permutation-test iterations"
+        required: true
+        default: "10000"
+        type: string
+      batches:
+        description: "Interleaved batches"
+        required: true
+        default: "9"
+        type: string
+      cpu_core:
+        description: "Optional CPU core pin (Linux taskset only)"
+        required: false
+        default: ""
+        type: string
+      trim_fraction:
+        description: "Trim fraction on each tail for robust stats"
+        required: true
+        default: "0.10"
+        type: string
+      strict_env:
+        description: "Fail if environment checks flag critical issues"
+        required: true
+        default: true
+        type: boolean
+      auto_commit:
+        description: "Commit and push updated benchmark artifacts"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  benchmark:
+    name: Run scientific demos, tests, and benchmark
+    runs-on: ${{ inputs.runner }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install matplotlib
+
+      - name: Fetch scientific demo data
+        run: scripts/fetch_scientific_demo_data.sh
+
+      - name: Run Rust tests
+        run: cargo test --all-features
+        env:
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
+
+      - name: Run benchmark + regenerate figures
+        shell: bash
+        run: |
+          STRICT_ENV=0
+          if [[ "${{ inputs.strict_env }}" == "true" ]]; then
+            STRICT_ENV=1
+          fi
+          bash examples/run_comparison.sh \
+            "${{ inputs.repeats }}" \
+            "${{ inputs.warmups }}" \
+            "${{ inputs.bootstrap_iters }}" \
+            "${{ inputs.permutation_iters }}" \
+            "${{ inputs.batches }}" \
+            "${{ inputs.cpu_core }}" \
+            "${{ inputs.trim_fraction }}" \
+            "${STRICT_ENV}"
+
+      - name: Upload benchmark artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: scientific-demo-benchmark-${{ github.run_id }}
+          path: |
+            examples/comparison.png
+            examples/output/comparison_timings.csv
+            examples/output/comparison_samples.csv
+            examples/output/comparison_environment.json
+
+      - name: Commit updated benchmark artifacts
+        if: ${{ inputs.auto_commit }}
+        shell: bash
+        run: |
+          if git diff --quiet -- \
+            examples/comparison.png \
+            examples/output/comparison_timings.csv \
+            examples/output/comparison_samples.csv \
+            examples/output/comparison_environment.json; then
+            echo "No benchmark artifact changes to commit"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add examples/comparison.png
+          git add examples/output/comparison_timings.csv
+          git add examples/output/comparison_samples.csv
+          git add examples/output/comparison_environment.json
+
+          git commit -m "ci: refresh scientific benchmark artifacts [skip ci]"
+          git push
