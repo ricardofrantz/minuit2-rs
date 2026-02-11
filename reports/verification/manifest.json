@@ -1,9 +1,9 @@
 {
-  "generated_at_utc": "2026-02-11T13:54:44Z",
+  "generated_at_utc": "2026-02-11T13:57:34Z",
   "project": {
     "name": "minuit2-rs",
     "git_branch": "master",
-    "git_commit": "15cada5a26e7cc080d11678cbd2b6cb03d94b7a3",
+    "git_commit": "3de1c79776e9c226606ead74fe556f5e06aa3457",
     "git_dirty": true
   },
   "environment": {
@@ -59,12 +59,12 @@
   },
   "executed_surface": {
     "executed_functions_total": 618,
-    "mapped_implemented_total": 68,
-    "unmapped_total": 550,
+    "mapped_implemented_total": 145,
+    "unmapped_total": 473,
     "priority_counts": {
       "P0": 0,
-      "P1": 139,
-      "P2": 411
+      "P1": 48,
+      "P2": 425
     },
     "gate_pass": false
   },

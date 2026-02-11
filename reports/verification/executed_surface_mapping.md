@@ -5,9 +5,9 @@ Join of reference executed C++ functions with traceability matrix mappings.
 ## Summary
 
 - Executed C++ functions: **618**
-- Mapped to implemented Rust symbols: **68**
-- Unmapped executed functions: **550**
-- Unmapped priority split: P0=0, P1=139, P2=411
+- Mapped to implemented Rust symbols: **145**
+- Unmapped executed functions: **473**
+- Unmapped priority split: P0=0, P1=48, P2=425
 - Gate (`P0 == 0 and P1 == 0`): **FAIL**
 - Coverage workloads used: **12**
 
@@ -22,18 +22,18 @@ Join of reference executed C++ functions with traceability matrix mappings.
 - `inc/Minuit2/MnPrint.h`: 220
 - `inc/Minuit2/MnMatrix.h`: 75
 - `inc/ROOT/span.hxx`: 22
-- `src/MnUserParameterState.cxx`: 22
-- `src/MnUserTransformation.cxx`: 19
 - `src/MnMatrix.cxx`: 14
-- `src/MnUserParameters.cxx`: 13
 - `src/MnPrint.cxx`: 9
 - `inc/Minuit2/FunctionGradient.h`: 8
 - `inc/Minuit2/MinimumSeed.h`: 6
 - `src/MnHesse.cxx`: 6
-- `src/MnMinos.cxx`: 6
 - `inc/Minuit2/MinimumParameters.h`: 5
-- `src/AnalyticalGradientCalculator.cxx`: 5
 - `src/MPIProcess.h`: 5
+- `src/MnApplication.cxx`: 5
+- `inc/Minuit2/FunctionMinimum.h`: 4
+- `inc/Minuit2/MinimumState.h`: 4
+- `inc/Minuit2/MnUserParameterState.h`: 4
+- `src/MPIProcess.cxx`: 4
 
 ## Top P0/P1 Gaps
 
@@ -70,13 +70,13 @@ Join of reference executed C++ functions with traceability matrix mappings.
 | P1 | `inc/Minuit2/MnUserTransformation.h` | `Precision` | `missing` | 553 |
 | P1 | `inc/Minuit2/VariableMetricBuilder.h` | `ErrorUpdator` | `missing` | 81 |
 | P1 | `inc/Minuit2/VariableMetricBuilder.h` | `Estimator` | `missing` | 81 |
-| P1 | `inc/ROOT/span.hxx` | `begin` | `missing` | 87 |
-| P1 | `inc/ROOT/span.hxx` | `begin` | `missing` | 1 |
-| P1 | `inc/ROOT/span.hxx` | `begin` | `missing` | 1 |
-| P1 | `inc/ROOT/span.hxx` | `begin` | `missing` | 55 |
-| P1 | `inc/ROOT/span.hxx` | `data` | `missing` | 6574 |
-| P1 | `inc/ROOT/span.hxx` | `end` | `missing` | 87 |
-| P1 | `inc/ROOT/span.hxx` | `end` | `missing` | 1 |
-| P1 | `inc/ROOT/span.hxx` | `end` | `missing` | 1 |
-| P1 | `inc/ROOT/span.hxx` | `end` | `missing` | 55 |
+| P1 | `src/HessianGradientCalculator.cxx` | `DeltaGradient` | `missing` | 15 |
+| P1 | `src/HessianGradientCalculator.cxx` | `Precision` | `missing` | 165 |
+| P1 | `src/MnHesse.cxx` | `ComputeAnalytical` | `missing` | 1 |
+| P1 | `src/MnHesse.cxx` | `ComputeNumerical` | `missing` | 15 |
+| P1 | `src/MnScan.cxx` | `Scan` | `missing` | 1 |
+| P1 | `src/MnUserParameterState.cxx` | `MinuitParameters` | `missing` | 12 |
+| P1 | `src/MnUserParameterState.cxx` | `Name` | `missing` | 16 |
+| P1 | `src/MnUserParameterState.cxx` | `Parameter` | `missing` | 380 |
+| P1 | `src/MnUserParameterState.cxx` | `Precision` | `missing` | 44 |
 

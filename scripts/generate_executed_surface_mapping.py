@@ -209,17 +209,34 @@ def extract_symbol_info(demangled: str) -> SymbolInfo:
     )
 
 
+def upstream_basename(path: str) -> str:
+    if not path:
+        return ""
+    part = path.replace("\\", "/").strip().split("/")[-1]
+    return re.sub(r"\.(h|hpp|cxx|cc|cpp)$", "", part)
+
+
 def index_traceability(
     rows: list[dict[str, str]]
-) -> tuple[dict[tuple[str, str], list[dict[str, str]]], dict[str, list[dict[str, str]]]]:
+) -> tuple[
+    dict[tuple[str, str], list[dict[str, str]]],
+    dict[str, list[dict[str, str]]],
+    dict[str, list[dict[str, str]]],
+]:
     by_key: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
     by_file: dict[str, list[dict[str, str]]] = defaultdict(list)
+    by_basename: dict[str, list[dict[str, str]]] = defaultdict(list)
     for row in rows:
         upstream_file = row.get("upstream_file", "").strip()
+        upstream_files = [p.strip() for p in upstream_file.split(";") if p.strip()] or [upstream_file]
         upstream_symbol = row.get("upstream_symbol", "").strip().replace(" ", "")
-        by_key[(upstream_file, upstream_symbol)].append(row)
-        by_file[upstream_file].append(row)
-    return by_key, by_file
+        for upstream_path in upstream_files:
+            by_key[(upstream_path, upstream_symbol)].append(row)
+            by_file[upstream_path].append(row)
+            base = upstream_basename(upstream_path)
+            if base:
+                by_basename[base].append(row)
+    return by_key, by_file, by_basename
 
 
 def read_waiver_rules(path: Path) -> list[dict[str, str]]:
@@ -330,7 +347,7 @@ def main() -> int:
     executed_rows = read_csv(Path(args.executed_csv))
     traceability_rows = read_csv(Path(args.traceability_csv))
     waiver_rules = read_waiver_rules(Path(args.waiver_rules_csv))
-    trace_by_key, trace_by_file = index_traceability(traceability_rows)
+    trace_by_key, trace_by_file, trace_by_basename = index_traceability(traceability_rows)
     workload_ids = load_workloads_from_reference_manifest(Path(args.reference_manifest))
 
     mangled_names = [extract_mangled_name(row.get("function", "")) for row in executed_rows]
@@ -348,7 +365,10 @@ def main() -> int:
         info = extract_symbol_info(demangled)
 
         upstream_file = normalize_upstream_file(row.get("file", ""))
+        file_basename = upstream_basename(upstream_file)
         file_rows = trace_by_file.get(upstream_file, [])
+        if not file_rows:
+            file_rows = trace_by_basename.get(file_basename, [])
         key = (upstream_file, info.symbol)
         matches = trace_by_key.get(key, [])
 
@@ -359,6 +379,21 @@ def main() -> int:
                 for r in file_rows
                 if r.get("upstream_symbol", "").strip().replace(" ", "").lower() == key_lower[1]
             ]
+        if not matches:
+            base_rows = trace_by_basename.get(file_basename, [])
+            matches = [
+                r
+                for r in base_rows
+                if r.get("upstream_symbol", "").strip().replace(" ", "") == info.symbol
+            ]
+            if not matches:
+                matches = [
+                    r
+                    for r in base_rows
+                    if r.get("upstream_symbol", "").strip().replace(" ", "").lower() == info.symbol.lower()
+                ]
+            if matches:
+                file_rows = base_rows
 
         # For files that are fully waived for low-priority architectural/intentional reasons
         # (e.g. MnPrint), treat unmatched instantiations as waived at file level.
