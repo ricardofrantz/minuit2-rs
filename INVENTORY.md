@@ -1,6 +1,12 @@
 # Minuit2 File Inventory
 
-Complete map of [GooFit/Minuit2](https://github.com/GooFit/Minuit2) files, categorized by phase and priority.
+Inventory map for Minuit2, categorized by phase and priority.
+
+Important:
+- Canonical upstream target for this Rust port is ROOT Minuit2:
+  - `https://github.com/root-project/root/tree/master/math/minuit2`
+  - target release baseline: `v6-36-08`
+- Paths used here (`inc/Minuit2/*`, `src/*`) are compatible with ROOT `math/minuit2` and are used by parity tooling.
 
 **Raw URL base**: `https://raw.githubusercontent.com/GooFit/Minuit2/master/`
 

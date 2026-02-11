@@ -62,4 +62,8 @@ impl MinimumParameters {
     pub fn has_step(&self) -> bool {
         self.has_step
     }
+
+    pub fn has_step_size(&self) -> bool {
+        self.has_step()
+    }
 }

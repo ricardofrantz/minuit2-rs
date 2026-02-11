@@ -1,0 +1,71 @@
+{
+  "generated_at_utc": "2026-02-11T12:47:05Z",
+  "project": {
+    "name": "minuit2-rs",
+    "git_branch": "master",
+    "git_commit": "6d64eeccffbb40ccf0332b2c54c8f74ea1ed38a4",
+    "git_dirty": true
+  },
+  "environment": {
+    "rustc": "rustc 1.93.0 (254b59607 2026-01-19)",
+    "cargo": "cargo 1.93.0 (083ac5135 2025-12-15)",
+    "python3": "Python 3.14.1"
+  },
+  "reference": {
+    "repo": "https://github.com/root-project/root",
+    "subdir": "math/minuit2",
+    "tag": "v6-36-08",
+    "commit": "a8ca1b23e38d7dbe0ff24027894ca0f2ad65f1bd"
+  },
+  "differential": {
+    "workloads_total": 6,
+    "status_counts": {
+      "pass": 4,
+      "warn": 2,
+      "fail": 0
+    },
+    "gate_pass": true
+  },
+  "traceability": {
+    "symbols_total": 415,
+    "status_counts": {
+      "implemented": 303,
+      "waived": 112,
+      "unresolved": 0
+    },
+    "gate_pass": true
+  },
+  "root_p0_tests": {
+    "known_gap_count": 0,
+    "gate_pass": true
+  },
+  "coverage": {
+    "core_no_default_features": {
+      "regions_pct": 73.09,
+      "functions_pct": 70.87,
+      "lines_pct": 73.12
+    },
+    "all_features": {
+      "regions_pct": 68.88,
+      "functions_pct": 66.62,
+      "lines_pct": 69.51
+    }
+  },
+  "reference_coverage": {
+    "functions_in_scope": 1716,
+    "functions_executed": 524,
+    "function_coverage_pct": 30.5361,
+    "line_coverage_pct": 41.6829
+  },
+  "benchmarks": {
+    "scan_serial_default": "2.441 \u00b5s",
+    "scan_serial_parallel_feature": "2.138 \u00b5s",
+    "scan_parallel_parallel_feature": "28.89 \u00b5s",
+    "scan_speedup_serial_over_parallel": 0.07400650789255055
+  },
+  "claims": {
+    "numerical_parity_on_covered_workloads": true,
+    "full_1_to_1_functional_coverage_vs_reference": true,
+    "full_100_percent_verifiable_coverage": false
+  }
+}

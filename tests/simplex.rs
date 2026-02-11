@@ -7,7 +7,9 @@ fn rosenbrock_2d() {
     let result = MnSimplex::new()
         .add("x", 0.0, 0.1)
         .add("y", 0.0, 0.1)
-        .tolerance(0.01)
+        // With ROOT-compatible Simplex EDM criterion, use a tighter tolerance
+        // for Rosenbrock to ensure full convergence.
+        .tolerance(1.0e-5)
         .minimize(&|p: &[f64]| {
             (1.0 - p[0]).powi(2) + 100.0 * (p[1] - p[0] * p[0]).powi(2)
         });
@@ -128,6 +130,7 @@ fn bounded_parameters() {
     // Minimize (x-3)^2 with x in [0, 5]
     let result = MnSimplex::new()
         .add_limited("x", 1.0, 0.5, 0.0, 5.0)
+        .tolerance(0.001)
         .minimize(&|p: &[f64]| (p[0] - 3.0).powi(2));
 
     assert!(result.is_valid(), "bounded min should converge");

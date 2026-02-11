@@ -9,7 +9,7 @@
 
 use nalgebra::DVector;
 
-use crate::fcn::FCNGradient;
+use crate::fcn::{FCN, FCNGradient};
 use crate::minimum::gradient::FunctionGradient;
 use crate::minimum::parameters::MinimumParameters;
 use crate::user_transformation::MnUserTransformation;
@@ -102,6 +102,49 @@ impl AnalyticalGradientCalculator {
         let mut result = FunctionGradient::new(grad, g2, gstep);
         result.set_analytical(true);
         result
+    }
+
+    pub fn can_compute_g2(fcn: &dyn FCN) -> bool {
+        fcn.has_g2() || fcn.has_hessian()
+    }
+
+    pub fn can_compute_hessian(fcn: &dyn FCN) -> bool {
+        fcn.has_hessian()
+    }
+
+    pub fn g2(fcn: &dyn FCN, parameters: &[f64]) -> Option<Vec<f64>> {
+        if fcn.has_g2() {
+            Some(fcn.g2(parameters))
+        } else if fcn.has_hessian() {
+            let h = fcn.hessian(parameters);
+            if h.is_empty() {
+                None
+            } else {
+                let mut n = 0usize;
+                while n * (n + 1) / 2 < h.len() {
+                    n += 1;
+                }
+                if n * (n + 1) / 2 != h.len() {
+                    return None;
+                }
+                let mut out = Vec::new();
+                for i in 0..n {
+                    let diag = i * (i + 3) / 2;
+                    out.push(h[diag]);
+                }
+                Some(out)
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn hessian(fcn: &dyn FCN, parameters: &[f64]) -> Option<Vec<f64>> {
+        if fcn.has_hessian() {
+            Some(fcn.hessian(parameters))
+        } else {
+            None
+        }
     }
 }
 

@@ -30,6 +30,15 @@
 //! println!("{result}");
 //! ```
 
+/// Canonical C++ upstream repository for this port.
+pub const REFERENCE_MINUIT2_REPOSITORY: &str = "https://github.com/root-project/root";
+/// Canonical C++ upstream subtree for Minuit2.
+pub const REFERENCE_MINUIT2_SUBTREE: &str = "math/minuit2";
+/// Target ROOT release baseline for functionality parity work.
+pub const REFERENCE_MINUIT2_TAG: &str = "v6-36-08";
+/// Pinned ROOT commit for the baseline release tag.
+pub const REFERENCE_MINUIT2_COMMIT: &str = "a8ca1b23e38d7dbe0ff24027894ca0f2ad65f1bd";
+
 pub mod application;
 pub mod contours;
 pub mod covariance_squeeze;

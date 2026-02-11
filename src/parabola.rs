@@ -15,6 +15,14 @@ impl MnParabolaPoint {
     pub fn new(x: f64, y: f64) -> Self {
         Self { x, y }
     }
+
+    pub fn x(&self) -> f64 {
+        self.x
+    }
+
+    pub fn y(&self) -> f64 {
+        self.y
+    }
 }
 
 /// Quadratic f(x) = a*x² + b*x + c.
@@ -44,6 +52,16 @@ impl MnParabola {
     /// Evaluate at a given x.
     pub fn y(&self, x: f64) -> f64 {
         self.a * x * x + self.b * x + self.c
+    }
+
+    /// Larger x root for a target y value.
+    pub fn x_pos(&self, y: f64) -> f64 {
+        (y / self.a + self.min() * self.min() - self.c / self.a).sqrt() + self.min()
+    }
+
+    /// Smaller x root for a target y value.
+    pub fn x_neg(&self, y: f64) -> f64 {
+        -(y / self.a + self.min() * self.min() - self.c / self.a).sqrt() + self.min()
     }
 
     /// Get the quadratic coefficient.

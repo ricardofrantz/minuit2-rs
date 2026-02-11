@@ -12,6 +12,7 @@ pub mod state;
 use seed::MinimumSeed;
 use state::MinimumState;
 
+use crate::global_cc::global_correlation_coefficients;
 use crate::user_parameter_state::MnUserParameterState;
 use crate::user_parameters::MnUserParameters;
 
@@ -29,7 +30,7 @@ pub struct FunctionMinimum {
 impl FunctionMinimum {
     pub fn new(seed: MinimumSeed, states: Vec<MinimumState>, up: f64) -> Self {
         // Build user state from the final internal state
-        let user_state = Self::build_user_state(&seed, states.last().unwrap_or(seed.state()));
+        let user_state = Self::build_user_state(&seed, states.last().unwrap_or(seed.state()), up);
 
         Self {
             seed,
@@ -43,7 +44,7 @@ impl FunctionMinimum {
 
     /// Create a result that hit the call limit.
     pub fn with_call_limit(seed: MinimumSeed, states: Vec<MinimumState>, up: f64) -> Self {
-        let user_state = Self::build_user_state(&seed, states.last().unwrap_or(seed.state()));
+        let user_state = Self::build_user_state(&seed, states.last().unwrap_or(seed.state()), up);
         Self {
             seed,
             states,
@@ -56,7 +57,7 @@ impl FunctionMinimum {
 
     /// Create a result above max EDM.
     pub fn above_max_edm(seed: MinimumSeed, states: Vec<MinimumState>, up: f64) -> Self {
-        let user_state = Self::build_user_state(&seed, states.last().unwrap_or(seed.state()));
+        let user_state = Self::build_user_state(&seed, states.last().unwrap_or(seed.state()), up);
         Self {
             seed,
             states,
@@ -67,27 +68,80 @@ impl FunctionMinimum {
         }
     }
 
-    fn build_user_state(seed: &MinimumSeed, last: &MinimumState) -> MnUserParameterState {
+    fn build_user_state(seed: &MinimumSeed, last: &MinimumState, up: f64) -> MnUserParameterState {
         let trafo = seed.trafo();
         let internal = last.parameters().vec().as_slice();
         let external = trafo.transform(internal);
+        let cov_is_valid = last.error().is_valid();
+        let mut ext_cov_opt = if cov_is_valid {
+            let mut cov = trafo.int2ext_covariance(internal, last.error().matrix());
+            for v in cov.data_mut().iter_mut() {
+                *v *= 2.0 * up;
+            }
+            Some(cov)
+        } else {
+            None
+        };
 
         // Build MnUserParameters with updated values
         let mut uparams = MnUserParameters::new();
         for (i, p) in trafo.parameters().iter().enumerate() {
-            if p.has_limits() {
-                uparams.add_limited(p.name(), external[i], p.error(), p.lower_limit(), p.upper_limit());
-            } else if p.has_lower_limit() {
-                uparams.add_lower_limited(p.name(), external[i], p.error(), p.lower_limit());
-            } else if p.has_upper_limit() {
-                uparams.add_upper_limited(p.name(), external[i], p.error(), p.upper_limit());
-            } else if p.is_const() {
+            if p.is_const() {
                 uparams.add_const(p.name(), p.value());
-            } else {
-                uparams.add(p.name(), external[i], p.error());
-            }
-            if p.is_fixed() && !p.is_const() {
+            } else if p.is_fixed() {
+                if p.has_limits() {
+                    uparams.add_limited(p.name(), p.value(), p.error(), p.lower_limit(), p.upper_limit());
+                } else if p.has_lower_limit() {
+                    uparams.add_lower_limited(p.name(), p.value(), p.error(), p.lower_limit());
+                } else if p.has_upper_limit() {
+                    uparams.add_upper_limited(p.name(), p.value(), p.error(), p.upper_limit());
+                } else {
+                    uparams.add(p.name(), p.value(), p.error());
+                }
                 uparams.fix(i);
+            } else if p.has_limits() {
+                let err = if cov_is_valid {
+                    let int_i = trafo
+                        .int_of_ext(i)
+                        .expect("variable parameter must map to internal index");
+                    let sigma_int = (2.0 * up * last.error().matrix()[(int_i, int_i)]).sqrt();
+                    trafo.int2ext_error(i, internal[int_i], sigma_int)
+                } else {
+                    p.error()
+                };
+                uparams.add_limited(p.name(), external[i], err, p.lower_limit(), p.upper_limit());
+            } else if p.has_lower_limit() {
+                let err = if cov_is_valid {
+                    let int_i = trafo
+                        .int_of_ext(i)
+                        .expect("variable parameter must map to internal index");
+                    let sigma_int = (2.0 * up * last.error().matrix()[(int_i, int_i)]).sqrt();
+                    trafo.int2ext_error(i, internal[int_i], sigma_int)
+                } else {
+                    p.error()
+                };
+                uparams.add_lower_limited(p.name(), external[i], err, p.lower_limit());
+            } else if p.has_upper_limit() {
+                let err = if cov_is_valid {
+                    let int_i = trafo
+                        .int_of_ext(i)
+                        .expect("variable parameter must map to internal index");
+                    let sigma_int = (2.0 * up * last.error().matrix()[(int_i, int_i)]).sqrt();
+                    trafo.int2ext_error(i, internal[int_i], sigma_int)
+                } else {
+                    p.error()
+                };
+                uparams.add_upper_limited(p.name(), external[i], err, p.upper_limit());
+            } else {
+                let err = if cov_is_valid {
+                    let int_i = trafo
+                        .int_of_ext(i)
+                        .expect("variable parameter must map to internal index");
+                    (2.0 * up * last.error().matrix()[(int_i, int_i)]).sqrt()
+                } else {
+                    p.error()
+                };
+                uparams.add(p.name(), external[i], err);
             }
         }
 
@@ -96,6 +150,19 @@ impl FunctionMinimum {
         state.set_edm(last.edm());
         state.set_nfcn(last.nfcn());
         state.set_valid(true);
+
+        if let Some(ext_cov) = ext_cov_opt.take() {
+            state.set_covariance(ext_cov.clone());
+            let n = ext_cov.nrow();
+            let mut cov_mat = nalgebra::DMatrix::zeros(n, n);
+            for i in 0..n {
+                for j in 0..n {
+                    cov_mat[(i, j)] = ext_cov.get(i, j);
+                }
+            }
+            let (gcc, _) = global_correlation_coefficients(&cov_mat);
+            state.set_global_cc(gcc);
+        }
         state
     }
 
@@ -145,6 +212,14 @@ impl FunctionMinimum {
         self.state().is_valid() && !self.is_above_max_edm && !self.reached_call_limit
     }
 
+    pub fn has_valid_parameters(&self) -> bool {
+        self.state().has_parameters()
+    }
+
+    pub fn has_made_pos_def_covar(&self) -> bool {
+        self.state().error().is_made_pos_def()
+    }
+
     /// Check if the result is above the maximum EDM threshold.
     pub fn is_above_max_edm(&self) -> bool {
         self.is_above_max_edm
@@ -163,6 +238,12 @@ impl FunctionMinimum {
     /// Number of variable parameters.
     pub fn n_variable_params(&self) -> usize {
         self.seed.n_variable_params()
+    }
+
+    pub fn set_error_def(&mut self, up: f64) {
+        self.up = up;
+        let rebuilt = Self::build_user_state(&self.seed, self.state(), up);
+        self.user_state = rebuilt;
     }
 
     /// Replace the user state (used by Hesse to inject covariance info).

@@ -7,6 +7,14 @@ use super::ParameterTransform;
 /// Exact formulas from SqrtUpParameterTransformation.cxx.
 pub struct SqrtUpTransform;
 
+impl SqrtUpTransform {
+    pub fn dext2int(&self, value: f64, upper: f64, lower: f64, prec: &MnMachinePrecision) -> f64 {
+        let int = self.ext2int(value, upper, lower, prec);
+        let d = self.dint2ext(int, upper, lower);
+        if d.abs() > prec.eps2() { 1.0 / d } else { 0.0 }
+    }
+}
+
 impl ParameterTransform for SqrtUpTransform {
     fn int2ext(&self, value: f64, upper: f64, _lower: f64) -> f64 {
         upper + 1.0 - (value * value + 1.0).sqrt()

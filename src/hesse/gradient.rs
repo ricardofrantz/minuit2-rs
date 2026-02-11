@@ -16,6 +16,10 @@ use crate::user_transformation::MnUserTransformation;
 pub struct HessianGradientCalculator;
 
 impl HessianGradientCalculator {
+    pub fn ncycle(strategy: &MnStrategy) -> u32 {
+        strategy.hessian_gradient_ncycles()
+    }
+
     /// Refine gradient using Hessian diagonal information.
     ///
     /// `hessian_g2` contains the second derivatives from the Hessian diagonal step.
@@ -35,7 +39,7 @@ impl HessianGradientCalculator {
         let vrysml = 8.0 * eps2 * eps2;
 
         let x = params.vec();
-        let ncycles = strategy.hess_grad_ncycles();
+        let ncycles = Self::ncycle(strategy);
         let step_tol = strategy.grad_step_tol();
         let grad_tol = strategy.grad_tol();
 

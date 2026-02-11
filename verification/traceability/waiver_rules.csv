@@ -1,0 +1,4 @@
+raw_status,rationale_contains,upstream_file_regex,upstream_symbol_regex,waiver_type,reason
+needs-review,architectural refactor,,,architectural,Intentional architectural refactor; no strict 1:1 symbol expected.
+needs-review,source unavailable,,,tooling,Upstream source extraction unavailable at pinned tag; tracked as tooling limitation.
+needs-review,unable to extract symbols with heuristic parser,,,tooling,Heuristic parser limitation for this upstream file; tracked as tooling waiver.

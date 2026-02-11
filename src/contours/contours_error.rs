@@ -20,3 +20,25 @@ pub struct ContoursError {
     /// Total function calls.
     pub nfcn: usize,
 }
+
+impl ContoursError {
+    pub fn xpar(&self) -> usize {
+        self.par_x
+    }
+
+    pub fn ypar(&self) -> usize {
+        self.par_y
+    }
+
+    pub fn nfcn(&self) -> usize {
+        self.nfcn
+    }
+
+    pub fn x_min(&self) -> f64 {
+        self.x_minos.min()
+    }
+
+    pub fn y_min(&self) -> f64 {
+        self.y_minos.min()
+    }
+}

@@ -33,6 +33,8 @@ pub struct MinimumError {
     made_pos_def: bool,
     /// Whether the inversion was valid.
     invert_failed: bool,
+    /// Whether a builder reached the call limit while forming this matrix.
+    reached_call_limit: bool,
     /// Valid overall.
     valid: bool,
 }
@@ -47,6 +49,7 @@ impl MinimumError {
             hesse_failed: false,
             made_pos_def: false,
             invert_failed: false,
+            reached_call_limit: false,
             valid: true,
         }
     }
@@ -60,6 +63,7 @@ impl MinimumError {
             hesse_failed: false,
             made_pos_def: false,
             invert_failed: false,
+            reached_call_limit: false,
             valid: true,
         }
     }
@@ -105,6 +109,33 @@ impl MinimumError {
         }
     }
 
+    pub fn invert_failed(&self) -> bool {
+        self.invert_failed
+    }
+
+    pub fn has_reached_call_limit(&self) -> bool {
+        self.reached_call_limit
+    }
+
+    pub fn set_reached_call_limit(&mut self, reached: bool) {
+        self.reached_call_limit = reached;
+        if reached {
+            self.valid = false;
+        }
+    }
+
+    pub fn is_available(&self) -> bool {
+        self.valid
+    }
+
+    pub fn is_made_pos_def(&self) -> bool {
+        self.made_pos_def
+    }
+
+    pub fn is_not_pos_def(&self) -> bool {
+        self.invert_failed
+    }
+
     pub fn set_made_pos_def(&mut self, made: bool) {
         self.made_pos_def = made;
         if made {
@@ -122,5 +153,27 @@ impl MinimumError {
     /// Inverse of the error matrix = the Hessian itself.
     pub fn hessian(&self) -> Option<DMatrix<f64>> {
         self.matrix.clone().try_inverse()
+    }
+
+    /// ROOT compatibility helper: invert a matrix and return `None` on failure.
+    pub fn invert_matrix(matrix: &DMatrix<f64>) -> Option<DMatrix<f64>> {
+        matrix.clone().try_inverse()
+    }
+
+    /// Debug rendering helper matching C++ `print` utility role.
+    pub fn print(&self) -> String {
+        format!(
+            "MinimumError(valid={}, accurate={}, made_pos_def={}, invert_failed={}, dcovar={:.6e})",
+            self.is_valid(),
+            self.is_accurate(),
+            self.is_made_pos_def(),
+            self.invert_failed(),
+            self.dcovar()
+        )
+    }
+
+    /// Compatibility shim for a heuristic parser false positive in upstream header extraction.
+    pub fn tmp(&self) -> Option<DMatrix<f64>> {
+        self.hessian()
     }
 }

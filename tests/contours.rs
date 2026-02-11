@@ -1,4 +1,4 @@
-use minuit2::{MnMigrad, MnHesse, MnContours};
+use minuit2::{MnContours, MnHesse, MnMigrad};
 
 /// 2D quadratic: contour points should form approximate ellipse.
 #[test]
@@ -15,7 +15,8 @@ fn contour_quadratic_ellipse() {
     let hesse_result = MnHesse::new().calculate(&quadratic, &result);
 
     let contours = MnContours::new(&quadratic, &hesse_result);
-    let points = contours.points(0, 1, 8);
+    let contour = contours.contour(0, 1, 8);
+    let points = &contour.points;
 
     // Should have at least 4 points (the cardinal MINOS points)
     assert!(
@@ -29,7 +30,13 @@ fn contour_quadratic_ellipse() {
     let fmin = hesse_result.fval();
     let target = fmin + up;
 
-    for (x, y) in &points {
+    assert_eq!(contour.xpar(), 0);
+    assert_eq!(contour.ypar(), 1);
+    assert_eq!(contour.nfcn(), 0);
+    assert!(contour.x_min().is_finite(), "x minimum should be finite");
+    assert!(contour.y_min().is_finite(), "y minimum should be finite");
+
+    for (x, y) in points {
         let f = quadratic(&[*x, *y]);
         // Contour points should be approximately at F = fmin + up
         // Allow generous tolerance since contour fitting is approximate

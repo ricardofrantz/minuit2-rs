@@ -55,9 +55,17 @@ impl SimplexParameters {
         self.jlow
     }
 
+    pub fn jl(&self) -> usize {
+        self.jlow()
+    }
+
     /// Index of worst (highest) vertex.
     pub fn jhigh(&self) -> usize {
         self.jhigh
+    }
+
+    pub fn jh(&self) -> usize {
+        self.jhigh()
     }
 
     /// Function value at best vertex.
@@ -73,6 +81,16 @@ impl SimplexParameters {
     /// Parameter vector at best vertex.
     pub fn best(&self) -> &[f64] {
         &self.params[self.jlow].1
+    }
+
+    /// Compatibility helper for the current direction-like span in simplex space.
+    pub fn dirin(&self) -> Vec<f64> {
+        if self.params.is_empty() {
+            return Vec::new();
+        }
+        let best = &self.params[self.jlow].1;
+        let worst = &self.params[self.jhigh].1;
+        best.iter().zip(worst).map(|(b, w)| w - b).collect()
     }
 
     /// Number of vertices (N+1).

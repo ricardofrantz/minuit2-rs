@@ -1,0 +1,30 @@
+{
+  "algorithm": "migrad",
+  "covariance": [
+    [
+      0.9020480732960939,
+      1.7905647432982814
+    ],
+    [
+      1.7905647432982814,
+      3.564325547113251
+    ]
+  ],
+  "edm": 2.275169231055e-05,
+  "errors": [
+    0.949762114055985,
+    1.887942146124518
+  ],
+  "fval": 1.499960399093e-05,
+  "has_covariance": true,
+  "has_minos": false,
+  "minos": null,
+  "nfcn": 199,
+  "params": [
+    0.996166803256539,
+    0.9924036358585998
+  ],
+  "runner": "minuit2-rs",
+  "valid": true,
+  "workload": "rosenbrock2_migrad"
+}

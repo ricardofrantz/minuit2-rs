@@ -48,6 +48,16 @@ impl MnUserCovariance {
     pub fn data_mut(&mut self) -> &mut [f64] {
         &mut self.data
     }
+
+    pub fn scale(&mut self, value: f64) {
+        for x in &mut self.data {
+            *x *= value;
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        self.data.len()
+    }
 }
 
 #[cfg(test)]

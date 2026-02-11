@@ -29,8 +29,9 @@ impl SimplexMinimizer {
             return FunctionMinimum::new(seed, Vec::new(), up);
         }
 
-        // Minimum EDM for convergence
-        let minedm = tolerance * up * 0.001;
+        // ROOT Minuit2 semantics: builder EDM target is tolerance scaled by Up.
+        // (`0.001` scaling is specific to Migrad's internal criterion, not Simplex.)
+        let minedm = tolerance * up;
 
         // Run Nelder-Mead iteration
         let states = SimplexBuilder::minimum(fcn, &seed, maxfcn, minedm);

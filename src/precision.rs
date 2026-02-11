@@ -33,6 +33,10 @@ impl MnMachinePrecision {
         self.eps = eps;
         self.eps2 = 2.0 * eps.sqrt();
     }
+
+    pub fn compute_precision(&mut self) {
+        self.set_precision(f64::EPSILON);
+    }
 }
 
 impl Default for MnMachinePrecision {

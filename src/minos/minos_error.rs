@@ -10,6 +10,8 @@ use super::cross::MnCross;
 pub struct MinosError {
     /// External parameter index.
     parameter: usize,
+    /// Parameter value at the original minimum.
+    min: f64,
     /// Hesse (parabolic) error for this parameter.
     hesse_error: f64,
     /// Lower crossing result.
@@ -19,9 +21,10 @@ pub struct MinosError {
 }
 
 impl MinosError {
-    pub fn new(parameter: usize, hesse_error: f64, lower: MnCross, upper: MnCross) -> Self {
+    pub fn new(parameter: usize, min: f64, hesse_error: f64, lower: MnCross, upper: MnCross) -> Self {
         Self {
             parameter,
+            min,
             hesse_error,
             lower,
             upper,
@@ -103,5 +106,10 @@ impl MinosError {
 
     pub fn nfcn(&self) -> usize {
         self.lower.nfcn() + self.upper.nfcn()
+    }
+
+    /// Parameter value at the minimum.
+    pub fn min(&self) -> f64 {
+        self.min
     }
 }

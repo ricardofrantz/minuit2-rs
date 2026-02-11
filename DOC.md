@@ -111,13 +111,12 @@ print(m.errors) # {'x': 0.1, 'y': 0.1}
 
 ## Parallel Processing
 
-Enabled with the `parallel` feature. Uses `rayon` to parallelize 1D parameter scans (`MnScan`).
+Enabled with the `parallel` feature. Uses `rayon` to parallelize 1D parameter scans via `MnScan::scan_parallel`.
 
 ```rust
 // Parallel scan across a parameter range
 let scan = MnScan::new(&fcn, &result);
-// Automatically uses all available cores with rayon
-let points = scan.scan(0, 100, -5.0, 5.0);
+let points = scan.scan_parallel(0, 100, -5.0, 5.0);
 ```
 
 ---

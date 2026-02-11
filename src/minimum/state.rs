@@ -84,4 +84,12 @@ impl MinimumState {
     pub fn has_parameters(&self) -> bool {
         true
     }
+
+    pub fn has_covariance(&self) -> bool {
+        self.error.is_available()
+    }
+
+    pub fn size(&self) -> usize {
+        self.parameters.vec().len()
+    }
 }

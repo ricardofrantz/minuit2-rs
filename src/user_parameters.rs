@@ -44,7 +44,14 @@ impl MnUserParameters {
     }
 
     /// Add a parameter with both bounds.
-    pub fn add_limited(&mut self, name: impl Into<String>, value: f64, error: f64, lower: f64, upper: f64) -> usize {
+    pub fn add_limited(
+        &mut self,
+        name: impl Into<String>,
+        value: f64,
+        error: f64,
+        lower: f64,
+        upper: f64,
+    ) -> usize {
         let name = name.into();
         let ext = self.trafo.parameters_len();
         let param = MinuitParameter::with_limits(ext, &name, value, error, lower, upper);
@@ -54,7 +61,13 @@ impl MnUserParameters {
     }
 
     /// Add a parameter with lower bound only.
-    pub fn add_lower_limited(&mut self, name: impl Into<String>, value: f64, error: f64, lower: f64) -> usize {
+    pub fn add_lower_limited(
+        &mut self,
+        name: impl Into<String>,
+        value: f64,
+        error: f64,
+        lower: f64,
+    ) -> usize {
         let name = name.into();
         let ext = self.trafo.parameters_len();
         let param = MinuitParameter::with_lower_limit(ext, &name, value, error, lower);
@@ -64,7 +77,13 @@ impl MnUserParameters {
     }
 
     /// Add a parameter with upper bound only.
-    pub fn add_upper_limited(&mut self, name: impl Into<String>, value: f64, error: f64, upper: f64) -> usize {
+    pub fn add_upper_limited(
+        &mut self,
+        name: impl Into<String>,
+        value: f64,
+        error: f64,
+        upper: f64,
+    ) -> usize {
         let name = name.into();
         let ext = self.trafo.parameters_len();
         let param = MinuitParameter::with_upper_limit(ext, &name, value, error, upper);
@@ -108,9 +127,29 @@ impl MnUserParameters {
         self.trafo.parameter_mut(ext).set_limits(lower, upper);
     }
 
+    pub fn set_lower_limit(&mut self, ext: usize, lower: f64) {
+        self.trafo.parameter_mut(ext).set_lower_limit(lower);
+    }
+
+    pub fn set_upper_limit(&mut self, ext: usize, upper: f64) {
+        self.trafo.parameter_mut(ext).set_upper_limit(upper);
+    }
+
     /// Remove limits by external index.
     pub fn remove_limits(&mut self, ext: usize) {
         self.trafo.parameter_mut(ext).remove_limits();
+    }
+
+    pub fn set_name(&mut self, ext: usize, name: impl Into<String>) {
+        let old = self.trafo.parameter(ext).name().to_string();
+        let new = name.into();
+        self.trafo.parameter_mut(ext).set_name(new.clone());
+        self.name_map.remove(&old);
+        self.name_map.insert(new, ext);
+    }
+
+    pub fn set_precision(&mut self, eps: f64) {
+        self.trafo.precision_mut().set_precision(eps);
     }
 
     /// Lookup external index by name.
@@ -131,6 +170,10 @@ impl MnUserParameters {
     /// Get parameter error by name.
     pub fn error(&self, name: &str) -> Option<f64> {
         self.parameter(name).map(|p| p.error())
+    }
+
+    pub fn errors(&self) -> Vec<f64> {
+        self.trafo.parameters().iter().map(|p| p.error()).collect()
     }
 
     /// Number of total parameters.
@@ -195,5 +238,35 @@ mod tests {
         p.set_error(0, 0.5);
         assert!((p.value("x").unwrap() - 42.0).abs() < 1e-15);
         assert!((p.error("x").unwrap() - 0.5).abs() < 1e-15);
+    }
+
+    #[test]
+    fn set_name_updates_lookup_map() {
+        let mut p = MnUserParameters::new();
+        p.add("x", 1.0, 0.1);
+        p.set_name(0, "alpha");
+        assert_eq!(p.index("x"), None);
+        assert_eq!(p.index("alpha"), Some(0));
+    }
+
+    #[test]
+    fn set_lower_and_upper_limits() {
+        let mut p = MnUserParameters::new();
+        p.add("x", 1.0, 0.1);
+        p.set_lower_limit(0, -2.0);
+        p.set_upper_limit(0, 3.0);
+        let x = p.parameter("x").expect("x must exist");
+        assert!(x.has_lower_limit());
+        assert!(x.has_upper_limit());
+        assert!((x.lower_limit() + 2.0).abs() < 1e-15);
+        assert!((x.upper_limit() - 3.0).abs() < 1e-15);
+    }
+
+    #[test]
+    fn set_precision_propagates_to_transformation() {
+        let mut p = MnUserParameters::new();
+        p.add("x", 1.0, 0.1);
+        p.set_precision(1.0e-12);
+        assert!((p.trafo().precision().eps() - 1.0e-12).abs() < 1.0e-24);
     }
 }

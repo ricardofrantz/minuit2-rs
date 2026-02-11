@@ -1,0 +1,35 @@
+{
+  "algorithm": "migrad+hesse+minos",
+  "covariance": [
+    [
+      1.005656817580727,
+      -0.037712127838095987
+    ],
+    [
+      -0.037712127838095987,
+      0.2514142046668124
+    ]
+  ],
+  "edm": 3.3064878557818185e-05,
+  "errors": [
+    1.002824420115868,
+    0.5014122103287997
+  ],
+  "fval": -0.6995269602629303,
+  "has_covariance": true,
+  "has_minos": true,
+  "minos": {
+    "lower": -1.0082332378374956,
+    "parameter": 0,
+    "upper": 0.9974487592363367,
+    "valid": true
+  },
+  "nfcn": 38,
+  "params": [
+    1.3127461827668936,
+    -2.0482092385692967
+  ],
+  "runner": "root-minuit2",
+  "valid": true,
+  "workload": "quadratic2_minos_p0"
+}

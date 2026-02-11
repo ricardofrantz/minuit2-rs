@@ -1,7 +1,8 @@
 use minuit2::{MnMigrad, MnHesse};
 
 /// Quadratic: f(x,y) = a*x^2 + b*y^2
-/// Analytical Hesse errors: sigma_x = sqrt(up/a), sigma_y = sqrt(up/b)
+/// ROOT Minuit2 user covariance convention: V = 2 * up * H^-1.
+/// Therefore sigma_x = sqrt(2*up / (2*a)) = sqrt(up/a), and similarly for y.
 #[test]
 fn hesse_quadratic_errors() {
     let a = 2.0;
@@ -25,20 +26,20 @@ fn hesse_quadratic_errors() {
     let state = hesse_result.user_state();
     assert!(state.has_covariance(), "Hesse should produce covariance");
 
-    // Analytical errors: sqrt(up / (2*a)), sqrt(up / (2*b))
     // For chi-square: up = 1.0
     // H_xx = 2*a = 4, H_yy = 2*b = 16
-    // sigma_x = sqrt(1/4) = 0.5, sigma_y = sqrt(1/16) = 0.25
+    // V_xx = 2/H_xx = 1/2, V_yy = 2/H_yy = 1/8
+    // sigma_x = sqrt(1/2) ≈ 0.7071, sigma_y = sqrt(1/8) ≈ 0.3536
     let err_x = state.error("x").unwrap();
     let err_y = state.error("y").unwrap();
 
     assert!(
-        (err_x - 0.5).abs() < 0.05,
-        "sigma_x should be ~0.5, got {err_x}"
+        (err_x - 0.7071067811865476).abs() < 0.05,
+        "sigma_x should be ~0.707, got {err_x}"
     );
     assert!(
-        (err_y - 0.25).abs() < 0.03,
-        "sigma_y should be ~0.25, got {err_y}"
+        (err_y - 0.3535533905932738).abs() < 0.03,
+        "sigma_y should be ~0.354, got {err_y}"
     );
 }
 
@@ -120,7 +121,7 @@ fn hesse_calculate_errors() {
     assert!(state.has_covariance());
     let err_x = state.error("x").unwrap();
     assert!(
-        (err_x - 0.5).abs() < 0.05,
-        "sigma_x should be ~0.5, got {err_x}"
+        (err_x - 0.7071067811865476).abs() < 0.05,
+        "sigma_x should be ~0.707, got {err_x}"
     );
 }

@@ -117,4 +117,12 @@ impl MigradSeedGenerator {
 
         MinimumSeed::new(state, trafo.clone())
     }
+
+    pub fn call_with_analytical_gradient_calculator(
+        fcn: &dyn FCNGradient,
+        trafo: &MnUserTransformation,
+        strategy: &MnStrategy,
+    ) -> MinimumSeed {
+        Self::generate_with_gradient(fcn, trafo, strategy)
+    }
 }

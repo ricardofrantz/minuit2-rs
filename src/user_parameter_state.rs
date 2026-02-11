@@ -94,6 +94,25 @@ impl MnUserParameterState {
         self.covariance = Some(cov);
     }
 
+    pub fn add_covariance(&mut self, i: usize, j: usize, value: f64) {
+        if self.covariance.is_none() {
+            self.covariance = Some(MnUserCovariance::new(self.params.variable_parameters()));
+            self.covariance_valid = true;
+        }
+        if let Some(cov) = self.covariance.as_mut() {
+            let current = cov.get(i, j);
+            cov.set(i, j, current + value);
+        }
+    }
+
+    pub fn covariance_status(&self) -> i32 {
+        if self.covariance_valid { 1 } else { 0 }
+    }
+
+    pub fn hessian(&self) -> Option<MnUserCovariance> {
+        self.covariance.clone()
+    }
+
     /// Get the global correlation coefficients if available.
     pub fn global_cc(&self) -> Option<&[f64]> {
         self.global_cc.as_deref()
@@ -109,7 +128,14 @@ impl MnUserParameterState {
         self.params.add(name, value, error)
     }
 
-    pub fn add_limited(&mut self, name: impl Into<String>, value: f64, error: f64, lower: f64, upper: f64) -> usize {
+    pub fn add_limited(
+        &mut self,
+        name: impl Into<String>,
+        value: f64,
+        error: f64,
+        lower: f64,
+        upper: f64,
+    ) -> usize {
         self.params.add_limited(name, value, error, lower, upper)
     }
 
@@ -129,12 +155,61 @@ impl MnUserParameterState {
         self.params.set_error(ext, err);
     }
 
+    pub fn set_limits(&mut self, ext: usize, lower: f64, upper: f64) {
+        self.params.set_limits(ext, lower, upper);
+    }
+
+    pub fn set_lower_limit(&mut self, ext: usize, lower: f64) {
+        self.params.set_lower_limit(ext, lower);
+    }
+
+    pub fn set_upper_limit(&mut self, ext: usize, upper: f64) {
+        self.params.set_upper_limit(ext, upper);
+    }
+
+    pub fn remove_limits(&mut self, ext: usize) {
+        self.params.remove_limits(ext);
+    }
+
+    pub fn set_name(&mut self, ext: usize, name: impl Into<String>) {
+        self.params.set_name(ext, name);
+    }
+
+    pub fn set_precision(&mut self, eps: f64) {
+        self.params.set_precision(eps);
+    }
+
     pub fn value(&self, name: &str) -> Option<f64> {
         self.params.value(name)
     }
 
     pub fn error(&self, name: &str) -> Option<f64> {
         self.params.error(name)
+    }
+
+    pub fn errors(&self) -> Vec<f64> {
+        self.params.errors()
+    }
+
+    pub fn index(&self, name: &str) -> Option<usize> {
+        self.params.index(name)
+    }
+
+    pub fn int2ext(&self, int: usize, internal: f64) -> f64 {
+        let ext = self.params.trafo().ext_of_int(int);
+        self.params.trafo().int2ext(ext, internal)
+    }
+
+    pub fn ext2int(&self, ext: usize, value: f64) -> f64 {
+        self.params.trafo().ext2int(ext, value)
+    }
+
+    pub fn int_of_ext(&self, ext: usize) -> Option<usize> {
+        self.params.trafo().int_of_ext(ext)
+    }
+
+    pub fn ext_of_int(&self, int: usize) -> usize {
+        self.params.trafo().ext_of_int(int)
     }
 
     pub fn parameter(&self, ext: usize) -> &MinuitParameter {
@@ -151,5 +226,45 @@ impl MnUserParameterState {
 
     pub fn is_empty(&self) -> bool {
         self.params.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn state_delegates_limit_operations() {
+        let mut params = MnUserParameters::new();
+        params.add("x", 1.0, 0.1);
+        let mut state = MnUserParameterState::new(params);
+
+        state.set_lower_limit(0, -1.0);
+        state.set_upper_limit(0, 2.0);
+        let p = state.parameter(0);
+        assert!(p.has_lower_limit());
+        assert!(p.has_upper_limit());
+    }
+
+    #[test]
+    fn state_name_and_index_roundtrip() {
+        let mut params = MnUserParameters::new();
+        params.add("x", 1.0, 0.1);
+        let mut state = MnUserParameterState::new(params);
+        state.set_name(0, "alpha");
+        assert_eq!(state.index("alpha"), Some(0));
+        assert_eq!(state.index("x"), None);
+    }
+
+    #[test]
+    fn state_internal_external_mapping() {
+        let mut params = MnUserParameters::new();
+        params.add("x", 3.0, 0.1);
+        let state = MnUserParameterState::new(params);
+
+        assert_eq!(state.int_of_ext(0), Some(0));
+        assert_eq!(state.ext_of_int(0), 0);
+        assert!((state.ext2int(0, 3.0) - 3.0).abs() < 1e-15);
+        assert!((state.int2ext(0, 3.0) - 3.0).abs() < 1e-15);
     }
 }

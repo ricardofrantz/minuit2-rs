@@ -9,6 +9,7 @@ pub mod minimizer;
 pub mod seed;
 
 use crate::fcn::{FCN, FCNGradient};
+use crate::application::DEFAULT_TOLERANCE;
 use crate::minimum::FunctionMinimum;
 use crate::mn_fcn::MnFcn;
 use crate::strategy::MnStrategy;
@@ -30,7 +31,7 @@ impl MnMigrad {
             params: MnUserParameters::new(),
             strategy: MnStrategy::default(),
             max_fcn: None,
-            tolerance: 1.0,
+            tolerance: DEFAULT_TOLERANCE,
         }
     }
 
@@ -83,7 +84,7 @@ impl MnMigrad {
         self
     }
 
-    /// Set tolerance (relative to error_def). Default = 1.0.
+    /// Set tolerance (relative to error_def). Default = 0.1.
     pub fn tolerance(mut self, tol: f64) -> Self {
         self.tolerance = tol;
         self

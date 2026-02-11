@@ -10,4 +10,4 @@ pub fn default_max_fcn(n: usize) -> usize {
 }
 
 /// Default tolerance.
-pub const DEFAULT_TOLERANCE: f64 = 1.0;
+pub const DEFAULT_TOLERANCE: f64 = 0.1;

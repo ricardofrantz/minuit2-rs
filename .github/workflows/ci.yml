@@ -10,6 +10,18 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  traceability:
+    name: Traceability gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate traceability matrix
+        run: python3 scripts/generate_traceability_matrix.py
+
+      - name: Enforce non-regression traceability gate
+        run: python3 scripts/check_traceability_gate.py --mode non-regression
+
   test:
     name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -27,6 +39,8 @@ jobs:
 
       - name: Run tests (all features)
         run: cargo test --all-features
+        env:
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
 
       - name: Run tests (no default features)
         run: cargo test --no-default-features
@@ -105,6 +119,8 @@ jobs:
 
       - name: Generate coverage
         run: cargo llvm-cov --all-features --lcov --output-path lcov.info
+        env:
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
@@ -125,3 +141,5 @@ jobs:
 
       - name: Run benchmarks
         run: cargo bench --all-features
+        env:
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"

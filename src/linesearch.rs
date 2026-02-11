@@ -166,6 +166,32 @@ pub fn mn_linesearch(
     MnParabolaPoint::new(xvmin, fvmin)
 }
 
+pub fn do_eval(fcn: &MnFcn, x: &[f64]) -> f64 {
+    fcn.call(x)
+}
+
+/// Compatibility wrapper for ROOT `CubicSearch` naming.
+pub fn cubic_search(
+    fcn: &MnFcn,
+    params: &MinimumParameters,
+    step: &DVector<f64>,
+    gdel: f64,
+    prec: &MnMachinePrecision,
+) -> MnParabolaPoint {
+    mn_linesearch(fcn, params, step, gdel, prec)
+}
+
+/// Compatibility wrapper for ROOT `BrentSearch` naming.
+pub fn brent_search(
+    fcn: &MnFcn,
+    params: &MinimumParameters,
+    step: &DVector<f64>,
+    gdel: f64,
+    prec: &MnMachinePrecision,
+) -> MnParabolaPoint {
+    mn_linesearch(fcn, params, step, gdel, prec)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

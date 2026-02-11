@@ -34,7 +34,13 @@ impl MinuitParameter {
     }
 
     /// Parameter with lower bound only.
-    pub fn with_lower_limit(num: usize, name: impl Into<String>, value: f64, error: f64, lower: f64) -> Self {
+    pub fn with_lower_limit(
+        num: usize,
+        name: impl Into<String>,
+        value: f64,
+        error: f64,
+        lower: f64,
+    ) -> Self {
         Self {
             num,
             name: name.into(),
@@ -50,7 +56,13 @@ impl MinuitParameter {
     }
 
     /// Parameter with upper bound only.
-    pub fn with_upper_limit(num: usize, name: impl Into<String>, value: f64, error: f64, upper: f64) -> Self {
+    pub fn with_upper_limit(
+        num: usize,
+        name: impl Into<String>,
+        value: f64,
+        error: f64,
+        upper: f64,
+    ) -> Self {
         Self {
             num,
             name: name.into(),
@@ -66,7 +78,14 @@ impl MinuitParameter {
     }
 
     /// Parameter with both bounds.
-    pub fn with_limits(num: usize, name: impl Into<String>, value: f64, error: f64, lower: f64, upper: f64) -> Self {
+    pub fn with_limits(
+        num: usize,
+        name: impl Into<String>,
+        value: f64,
+        error: f64,
+        lower: f64,
+        upper: f64,
+    ) -> Self {
         Self {
             num,
             name: name.into(),
@@ -103,6 +122,10 @@ impl MinuitParameter {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn set_name(&mut self, name: impl Into<String>) {
+        self.name = name.into();
     }
 
     pub fn value(&self) -> f64 {
@@ -227,5 +250,12 @@ mod tests {
         assert!(p.is_fixed());
         p.release();
         assert!(p.is_fixed()); // still fixed
+    }
+
+    #[test]
+    fn set_name_updates_parameter_name() {
+        let mut p = MinuitParameter::new(0, "x", 1.0, 0.1);
+        p.set_name("alpha");
+        assert_eq!(p.name(), "alpha");
     }
 }

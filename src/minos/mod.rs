@@ -60,12 +60,19 @@ impl<'a> MnMinos<'a> {
         (me.lower_error(), me.upper_error())
     }
 
+    /// ROOT-compatible alias for `errors`.
+    pub fn minos(&self, par: usize) -> MinosError {
+        self.minos_error(par)
+    }
+
     /// Full MinosError (both crossings) for parameter `par`.
     pub fn minos_error(&self, par: usize) -> MinosError {
-        let hesse_err = self.minimum.user_state().parameter(par).error();
+        let p = self.minimum.user_state().parameter(par);
+        let min_val = p.value();
+        let hesse_err = p.error();
         let lo = self.lower(par);
         let up = self.upper(par);
-        MinosError::new(par, hesse_err, lo, up)
+        MinosError::new(par, min_val, hesse_err, lo, up)
     }
 
     /// Lower crossing only.
@@ -76,6 +83,41 @@ impl<'a> MnMinos<'a> {
     /// Upper crossing only.
     pub fn upper(&self, par: usize) -> MnCross {
         self.find_crossing(par, 1.0)
+    }
+
+    /// ROOT-compatible alias for `lower` crossing object.
+    pub fn loval(&self, par: usize) -> MnCross {
+        self.lower(par)
+    }
+
+    /// ROOT-compatible alias for `upper` crossing object.
+    pub fn upval(&self, par: usize) -> MnCross {
+        self.upper(par)
+    }
+
+    /// ROOT-compatible helper with explicit direction.
+    pub fn find_cross_value(&self, dir: i32, par: usize, maxcalls: usize, toler: f64) -> MnCross {
+        let direction = if dir < 0 { -1.0 } else { 1.0 };
+        let nvar = self.minimum.n_variable_params();
+        let default_calls = 2 * (nvar + 1) * (200 + 100 * nvar + 5 * nvar * nvar);
+        let maxcalls = if maxcalls == 0 { default_calls } else { maxcalls };
+
+        let user_state = self.minimum.user_state();
+        let p = user_state.parameter(par);
+        let err = p.error();
+        let val = p.value();
+        let pdir = direction * err;
+        let pmid = val + pdir;
+        function_cross::find_crossing(
+            self.fcn,
+            self.minimum,
+            par,
+            pmid,
+            pdir,
+            toler,
+            maxcalls,
+            &self.strategy,
+        )
     }
 
     fn find_crossing(&self, par: usize, direction: f64) -> MnCross {

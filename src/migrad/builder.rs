@@ -399,6 +399,28 @@ impl VariableMetricBuilder {
     /// DFP (Davidon-Fletcher-Powell) rank-2 update of the inverse Hessian.
     ///
     /// Returns `(V_new, dcovar)`.
+    pub fn update(
+        error: &MinimumError,
+        p_new: &MinimumParameters,
+        p_old: &MinimumParameters,
+        g_new: &FunctionGradient,
+        g_old: &FunctionGradient,
+    ) -> (DMatrix<f64>, f64) {
+        Self::dfp_update(error, p_new, p_old, g_new, g_old)
+    }
+
+    pub fn nrow(error: &MinimumError) -> usize {
+        error.matrix().nrows()
+    }
+
+    pub fn has_negative_g2(gradient: &FunctionGradient) -> bool {
+        gradient.g2().iter().any(|g2| *g2 <= 0.0)
+    }
+
+    pub fn add_result(states: &mut Vec<MinimumState>, state: MinimumState) {
+        states.push(state);
+    }
+
     fn dfp_update(
         error: &MinimumError,
         p_new: &MinimumParameters,

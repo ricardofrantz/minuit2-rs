@@ -8,6 +8,7 @@
 //! Uses a builder pattern to configure parameters, then call `minimize()`.
 
 use crate::fcn::FCN;
+use crate::application::DEFAULT_TOLERANCE;
 use crate::minimum::FunctionMinimum;
 use crate::migrad::MnMigrad;
 use crate::simplex::MnSimplex;
@@ -29,7 +30,7 @@ impl MnMinimize {
             params: MnUserParameters::new(),
             strategy: MnStrategy::default(),
             max_fcn: None,
-            tolerance: 1.0,
+            tolerance: DEFAULT_TOLERANCE,
         }
     }
 
@@ -81,28 +82,21 @@ impl MnMinimize {
         self
     }
 
-    /// Set tolerance (relative to error_def). Default = 1.0.
+    /// Set tolerance (relative to error_def). Default = 0.1.
     pub fn tolerance(mut self, tol: f64) -> Self {
         self.tolerance = tol;
         self
     }
 
-    /// Run the hybrid minimization (Simplex then Migrad).
-    pub fn minimize(&self, fcn: &dyn FCN) -> FunctionMinimum {
-        let n = self.params.variable_parameters();
-        let max_fcn = self.max_fcn.unwrap_or(200 + 100 * n + 5 * n * n);
-
-        // Phase 1: Run Simplex for global exploration
-        let simplex = MnSimplex::new()
-            .with_strategy(self.strategy.strategy());
-
-        // Re-add all parameters to simplex with same configuration
-        let mut simplex_builder = simplex;
-        for param in self.params.params().iter() {
+    fn configure_simplex_from_params(
+        mut simplex: MnSimplex,
+        params: &MnUserParameters,
+    ) -> MnSimplex {
+        for param in params.params() {
             if param.is_const() {
-                simplex_builder = simplex_builder.add_const(param.name(), param.value());
+                simplex = simplex.add_const(param.name(), param.value());
             } else if param.has_limits() {
-                simplex_builder = simplex_builder.add_limited(
+                simplex = simplex.add_limited(
                     param.name(),
                     param.value(),
                     param.error(),
@@ -110,49 +104,41 @@ impl MnMinimize {
                     param.upper_limit(),
                 );
             } else if param.has_lower_limit() {
-                simplex_builder = simplex_builder.add_lower_limited(
+                simplex = simplex.add_lower_limited(
                     param.name(),
                     param.value(),
                     param.error(),
                     param.lower_limit(),
                 );
             } else if param.has_upper_limit() {
-                simplex_builder = simplex_builder.add_upper_limited(
+                simplex = simplex.add_upper_limited(
                     param.name(),
                     param.value(),
                     param.error(),
                     param.upper_limit(),
                 );
             } else {
-                simplex_builder = simplex_builder.add(param.name(), param.value(), param.error());
+                simplex = simplex.add(param.name(), param.value(), param.error());
             }
 
             if param.is_fixed() && !param.is_const() {
-                simplex_builder = simplex_builder.fix(param.number());
+                simplex = simplex.fix(param.number());
             }
         }
+        simplex
+    }
 
-        let simplex_builder = simplex_builder
-            .max_fcn(max_fcn / 2) // Use half budget for simplex
-            .tolerance(self.tolerance);
-
-        let simplex_result = simplex_builder.minimize(fcn);
-
-        // Phase 2: Run Migrad from simplex result
-        let extracted_params = simplex_result.params();
-        let user_params = simplex_result.user_state().params();
-
-        let mut migrad = MnMigrad::new()
-            .with_strategy(self.strategy.strategy());
-
-        // Re-seed Migrad with extracted parameter values
-        for (i, param) in user_params.params().iter().enumerate() {
+    fn configure_migrad_from_params(
+        mut migrad: MnMigrad,
+        params: &MnUserParameters,
+    ) -> MnMigrad {
+        for param in params.params() {
             if param.is_const() {
                 migrad = migrad.add_const(param.name(), param.value());
             } else if param.has_limits() {
                 migrad = migrad.add_limited(
                     param.name(),
-                    extracted_params[i],
+                    param.value(),
                     param.error(),
                     param.lower_limit(),
                     param.upper_limit(),
@@ -160,31 +146,79 @@ impl MnMinimize {
             } else if param.has_lower_limit() {
                 migrad = migrad.add_lower_limited(
                     param.name(),
-                    extracted_params[i],
+                    param.value(),
                     param.error(),
                     param.lower_limit(),
                 );
             } else if param.has_upper_limit() {
                 migrad = migrad.add_upper_limited(
                     param.name(),
-                    extracted_params[i],
+                    param.value(),
                     param.error(),
                     param.upper_limit(),
                 );
             } else {
-                migrad = migrad.add(param.name(), extracted_params[i], param.error());
+                migrad = migrad.add(param.name(), param.value(), param.error());
             }
 
             if param.is_fixed() && !param.is_const() {
-                migrad = migrad.fix(i);
+                migrad = migrad.fix(param.number());
             }
         }
+        migrad
+    }
 
-        let migrad = migrad
-            .max_fcn(max_fcn / 2) // Use remaining half budget for migrad
-            .tolerance(self.tolerance);
+    /// Run the combined minimization.
+    ///
+    /// ROOT Minuit2 parity:
+    /// 1) Try Migrad first.
+    /// 2) If Migrad fails, run Simplex with strategy 2.
+    /// 3) If Simplex succeeds, run Migrad again from that point (strategy 2).
+    /// 4) If second Migrad fails, return the Simplex minimum.
+    pub fn minimize(&self, fcn: &dyn FCN) -> FunctionMinimum {
+        let n = self.params.variable_parameters();
+        let max_fcn = self.max_fcn.unwrap_or(200 + 100 * n + 5 * n * n);
 
-        migrad.minimize(fcn)
+        // Attempt 1: Migrad with user-selected strategy.
+        let migrad = Self::configure_migrad_from_params(
+            MnMigrad::new().with_strategy(self.strategy.strategy()),
+            &self.params,
+        )
+        .max_fcn(max_fcn)
+        .tolerance(self.tolerance);
+        let min = migrad.minimize(fcn);
+
+        if min.is_valid() {
+            return min;
+        }
+
+        // Fallback path (ROOT CombinedMinimumBuilder): use strategy 2.
+        let fallback_strategy = 2_u32;
+        let simplex = Self::configure_simplex_from_params(
+            MnSimplex::new().with_strategy(fallback_strategy),
+            &self.params,
+        )
+        .max_fcn(max_fcn)
+        .tolerance(self.tolerance);
+        let simplex_min = simplex.minimize(fcn);
+
+        if !simplex_min.is_valid() {
+            return simplex_min;
+        }
+
+        let migrad2 = Self::configure_migrad_from_params(
+            MnMigrad::new().with_strategy(fallback_strategy),
+            &simplex_min.user_state().params(),
+        )
+        .max_fcn(max_fcn)
+        .tolerance(self.tolerance);
+        let min2 = migrad2.minimize(fcn);
+
+        if min2.is_valid() {
+            min2
+        } else {
+            simplex_min
+        }
     }
 }
 

@@ -8,7 +8,9 @@
 
 use crate::parameter::MinuitParameter;
 use crate::precision::MnMachinePrecision;
-use crate::transform::{SinTransform, SqrtLowTransform, SqrtUpTransform, ParameterTransform};
+use crate::transform::{ParameterTransform, SinTransform, SqrtLowTransform, SqrtUpTransform};
+use crate::user_covariance::MnUserCovariance;
+use nalgebra::DMatrix;
 
 #[derive(Debug, Clone)]
 pub struct MnUserTransformation {
@@ -73,6 +75,62 @@ impl MnUserTransformation {
 
     pub fn parameter_mut(&mut self, ext: usize) -> &mut MinuitParameter {
         &mut self.parameters[ext]
+    }
+
+    pub fn params(&self) -> Vec<f64> {
+        self.parameters.iter().map(|p| p.value()).collect()
+    }
+
+    pub fn errors(&self) -> Vec<f64> {
+        self.parameters.iter().map(|p| p.error()).collect()
+    }
+
+    pub fn value(&self, ext: usize) -> f64 {
+        self.parameters[ext].value()
+    }
+
+    pub fn error(&self, ext: usize) -> f64 {
+        self.parameters[ext].error()
+    }
+
+    pub fn index(&self, name: &str) -> Option<usize> {
+        self.parameters.iter().position(|p| p.name() == name)
+    }
+
+    pub fn find_index(&self, name: &str) -> Option<usize> {
+        self.index(name)
+    }
+
+    pub fn set_value(&mut self, ext: usize, val: f64) {
+        self.parameters[ext].set_value(val);
+    }
+
+    pub fn set_error(&mut self, ext: usize, err: f64) {
+        self.parameters[ext].set_error(err);
+    }
+
+    pub fn set_limits(&mut self, ext: usize, lower: f64, upper: f64) {
+        self.parameters[ext].set_limits(lower, upper);
+    }
+
+    pub fn set_lower_limit(&mut self, ext: usize, lower: f64) {
+        self.parameters[ext].set_lower_limit(lower);
+    }
+
+    pub fn set_upper_limit(&mut self, ext: usize, upper: f64) {
+        self.parameters[ext].set_upper_limit(upper);
+    }
+
+    pub fn remove_limits(&mut self, ext: usize) {
+        self.parameters[ext].remove_limits();
+    }
+
+    pub fn set_name(&mut self, ext: usize, name: impl Into<String>) {
+        self.parameters[ext].set_name(name);
+    }
+
+    pub fn set_precision(&mut self, eps: f64) {
+        self.precision.set_precision(eps);
     }
 
     /// External index → internal index. Returns None if fixed.
@@ -142,14 +200,66 @@ impl MnUserTransformation {
         }
     }
 
+    /// Derivative d(internal)/d(external) for parameter `ext`.
+    pub fn dext2int(&self, ext: usize, internal: f64) -> f64 {
+        let d = self.dint2ext(ext, internal);
+        if d.abs() > self.precision.eps2() {
+            1.0 / d
+        } else {
+            0.0
+        }
+    }
+
     /// Internal error from external error, accounting for transform derivative.
     pub fn int2ext_error(&self, ext: usize, internal: f64, err: f64) -> f64 {
         let dx = self.dint2ext(ext, internal);
-        if dx > 0.0 {
-            err / dx
-        } else {
-            err
+        if dx > 0.0 { err / dx } else { err }
+    }
+
+    pub fn int2ext_covariance(&self, internal: &[f64], cov: &DMatrix<f64>) -> MnUserCovariance {
+        let n = self.variable_parameters();
+        assert_eq!(internal.len(), n, "internal vector size mismatch");
+        assert_eq!(cov.nrows(), n, "covariance row size mismatch");
+        assert_eq!(cov.ncols(), n, "covariance col size mismatch");
+
+        let jac: Vec<f64> = (0..n)
+            .map(|int| {
+                let ext = self.ext_of_int(int);
+                self.dint2ext(ext, internal[int])
+            })
+            .collect();
+
+        let mut data = Vec::with_capacity(n * (n + 1) / 2);
+        for i in 0..n {
+            for j in 0..=i {
+                data.push(jac[i] * cov[(i, j)] * jac[j]);
+            }
         }
+
+        MnUserCovariance::from_vec(data, n)
+    }
+
+    pub fn ext2int_covariance(&self, internal: &[f64], cov: &DMatrix<f64>) -> MnUserCovariance {
+        let n = self.variable_parameters();
+        assert_eq!(internal.len(), n, "internal vector size mismatch");
+        assert_eq!(cov.nrows(), n, "covariance row size mismatch");
+        assert_eq!(cov.ncols(), n, "covariance col size mismatch");
+
+        let jac_inv: Vec<f64> = (0..n)
+            .map(|int| {
+                let ext = self.ext_of_int(int);
+                self.dext2int(ext, internal[int])
+            })
+            .collect();
+
+        let mut data = Vec::with_capacity(n * (n + 1) / 2);
+        for i in 0..n {
+            for j in 0..=i {
+                data.push(jac_inv[i] * cov[(i, j)] * jac_inv[j]);
+            }
+        }
+
+        MnUserCovariance::from_vec(data, n)
     }
 
     /// Add a new variable parameter. Returns external index.
@@ -211,11 +321,7 @@ impl MnUserTransformation {
                 let p = &self.parameters[ext];
                 let int_val = self.ext2int(ext, p.value());
                 let dx = self.dint2ext(ext, int_val);
-                if dx > 0.0 {
-                    p.error() / dx
-                } else {
-                    p.error()
-                }
+                if dx > 0.0 { p.error() / dx } else { p.error() }
             })
             .collect()
     }
@@ -224,6 +330,7 @@ impl MnUserTransformation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use nalgebra::DMatrix;
 
     #[test]
     fn variable_count() {
@@ -264,5 +371,40 @@ mod tests {
         let t = MnUserTransformation::new(params);
         assert!((t.ext2int(0, pi) - pi).abs() < 1e-15);
         assert!((t.int2ext(0, pi) - pi).abs() < 1e-15);
+    }
+
+    #[test]
+    fn find_index_by_name() {
+        let params = vec![
+            MinuitParameter::new(0, "x", 1.0, 0.1),
+            MinuitParameter::new(1, "y", 2.0, 0.2),
+        ];
+        let t = MnUserTransformation::new(params);
+        assert_eq!(t.find_index("x"), Some(0));
+        assert_eq!(t.find_index("y"), Some(1));
+        assert_eq!(t.find_index("z"), None);
+    }
+
+    #[test]
+    fn set_precision_updates_machine_precision() {
+        let params = vec![MinuitParameter::new(0, "x", 1.0, 0.1)];
+        let mut t = MnUserTransformation::new(params);
+        t.set_precision(1.0e-12);
+        assert!((t.precision().eps() - 1.0e-12).abs() < 1.0e-24);
+    }
+
+    #[test]
+    fn int2ext_covariance_identity_for_unbounded() {
+        let params = vec![
+            MinuitParameter::new(0, "x", 1.0, 0.1),
+            MinuitParameter::new(1, "y", 2.0, 0.2),
+        ];
+        let t = MnUserTransformation::new(params);
+        let internal = t.initial_internal_values();
+        let cov = DMatrix::from_row_slice(2, 2, &[1.0, 0.2, 0.2, 4.0]);
+        let ucov = t.int2ext_covariance(&internal, &cov);
+        assert!((ucov.get(0, 0) - 1.0).abs() < 1e-12);
+        assert!((ucov.get(0, 1) - 0.2).abs() < 1e-12);
+        assert!((ucov.get(1, 1) - 4.0).abs() < 1e-12);
     }
 }

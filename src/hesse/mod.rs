@@ -43,6 +43,18 @@ impl MnHesse {
         self
     }
 
+    pub fn ncycles(&self) -> u32 {
+        self.strategy.hessian_ncycles()
+    }
+
+    pub fn tolerstp(&self) -> f64 {
+        self.strategy.hessian_step_tolerance()
+    }
+
+    pub fn toler_g2(&self) -> f64 {
+        self.strategy.hessian_g2_tolerance()
+    }
+
     /// Run Hesse on a minimization result.
     ///
     /// Returns a new FunctionMinimum with accurate covariance matrix.
@@ -116,7 +128,9 @@ fn build_user_state_with_covariance(
     let n = trafo.variable_parameters();
 
     // Transform internal covariance to external covariance.
-    // V_ext(i,j) = dint2ext(i) * V_int(i,j) * dint2ext(j)
+    // ROOT Minuit2 convention for user covariance is:
+    //   V_user = 2 * up * V_int transformed to external coordinates.
+    // where V_int is the internal inverse Hessian.
     let internal_params = minimum.state().parameters().vec();
     let mut ext_cov = MnUserCovariance::new(n);
 
@@ -128,15 +142,15 @@ fn build_user_state_with_covariance(
             let ext_j = trafo.ext_of_int(j);
             let dxdi_j = trafo.dint2ext(ext_j, internal_params[j]);
 
-            let val = dxdi_i * internal_cov[(i, j)] * dxdi_j;
+            let val = (2.0 * up) * dxdi_i * internal_cov[(i, j)] * dxdi_j;
             ext_cov.set(i, j, val);
         }
     }
 
-    // Update parameter errors from diagonal of external covariance
+    // Parameter errors are sqrt(diagonal(user covariance)).
     for i in 0..n {
         let ext_i = trafo.ext_of_int(i);
-        let err = (ext_cov.get(i, i) * up).sqrt();
+        let err = ext_cov.get(i, i).sqrt();
         user_state.set_error(ext_i, err);
     }
 

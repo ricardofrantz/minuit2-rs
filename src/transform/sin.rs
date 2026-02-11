@@ -9,6 +9,14 @@ use super::ParameterTransform;
 /// Exact formulas from SinParameterTransformation.cxx.
 pub struct SinTransform;
 
+impl SinTransform {
+    pub fn dext2int(&self, value: f64, upper: f64, lower: f64, prec: &MnMachinePrecision) -> f64 {
+        let int = self.ext2int(value, upper, lower, prec);
+        let d = self.dint2ext(int, upper, lower);
+        if d.abs() > prec.eps2() { 1.0 / d } else { 0.0 }
+    }
+}
+
 impl ParameterTransform for SinTransform {
     fn int2ext(&self, value: f64, upper: f64, lower: f64) -> f64 {
         lower + 0.5 * (upper - lower) * (value.sin() + 1.0)

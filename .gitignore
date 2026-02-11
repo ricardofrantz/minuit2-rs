@@ -1,1 +1,8 @@
 /target
+/.cache
+/third_party/root_ref
+/third_party/root_ref_build
+__pycache__/
+*.pyc
+*.profraw
+*.profdata

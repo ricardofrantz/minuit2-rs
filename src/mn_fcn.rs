@@ -34,6 +34,17 @@ impl<'a> MnFcn<'a> {
         self.fcn.value(&external)
     }
 
+    /// Evaluate an FCN with already transformed (external) parameters.
+    pub fn call_with_transformed_params(&self, external: &[f64]) -> f64 {
+        self.num_calls.set(self.num_calls.get() + 1);
+        self.fcn.value(external)
+    }
+
+    /// Evaluate without applying the internal->external transformation.
+    pub fn call_without_doing_trafo(&self, external: &[f64]) -> f64 {
+        self.call_with_transformed_params(external)
+    }
+
     /// Get the total number of function calls made.
     pub fn num_of_calls(&self) -> usize {
         self.num_calls.get()

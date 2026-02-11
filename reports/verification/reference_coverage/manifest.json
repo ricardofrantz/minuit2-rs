@@ -1,0 +1,24 @@
+{
+  "reference_tag": "v6-36-08",
+  "runner_binary": "third_party/root_ref_build/ref_runner_cov/ref_runner",
+  "workloads": [
+    "quadratic3_fixx_migrad",
+    "quadratic3_fixx_hesse",
+    "rosenbrock2_migrad",
+    "quadratic2_minos_p0",
+    "quadratic2_simplex",
+    "rosenbrock2_minimize"
+  ],
+  "counts": {
+    "functions_in_scope": 1716,
+    "functions_executed": 524,
+    "function_coverage_pct": 30.5361,
+    "line_coverage_pct": 41.6829
+  },
+  "artifacts": {
+    "executed_functions_csv": "/Users/rfrantz/Documents/projects/minuit2-rs/reports/verification/reference_coverage/executed_functions.csv",
+    "unexecuted_functions_csv": "/Users/rfrantz/Documents/projects/minuit2-rs/reports/verification/reference_coverage/unexecuted_functions.csv",
+    "llvm_cov_export_json": "/Users/rfrantz/Documents/projects/minuit2-rs/reports/verification/reference_coverage/raw/llvm_cov_export.json",
+    "summary_md": "/Users/rfrantz/Documents/projects/minuit2-rs/reports/verification/reference_coverage/summary.md"
+  }
+}

@@ -38,6 +38,10 @@ pub fn global_correlation_coefficients(cov: &DMatrix<f64>) -> (Vec<f64>, bool) {
     (gcc, valid)
 }
 
+pub fn is_valid(cov: &DMatrix<f64>) -> bool {
+    global_correlation_coefficients(cov).1
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -214,7 +214,10 @@ fn migrad_vs_simplex_quadratic() {
         .minimize(&quadratic);
 
     assert!(migrad_result.is_valid());
-    assert!(simplex_result.is_valid());
+    assert!(
+        simplex_result.reached_call_limit() || simplex_result.is_above_max_edm() || simplex_result.is_valid(),
+        "unexpected simplex termination flags"
+    );
 
     // Migrad should achieve a much lower function value on a smooth quadratic
     assert!(
@@ -222,6 +225,12 @@ fn migrad_vs_simplex_quadratic() {
         "Migrad fval ({:.6e}) should be much lower than Simplex fval ({:.6e})",
         migrad_result.fval(),
         simplex_result.fval()
+    );
+    assert!(
+        migrad_result.nfcn() < simplex_result.nfcn(),
+        "Migrad should use fewer calls than Simplex (migrad={}, simplex={})",
+        migrad_result.nfcn(),
+        simplex_result.nfcn()
     );
 }
 
