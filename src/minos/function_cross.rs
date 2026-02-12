@@ -8,6 +8,7 @@ use crate::fcn::FCN;
 use crate::migrad::MnMigrad;
 use crate::minimum::FunctionMinimum;
 use crate::parabola::{MnParabolaPoint, from_3_points};
+use crate::parameter::MinuitParameter;
 use crate::strategy::MnStrategy;
 
 use super::cross::MnCross;
@@ -51,6 +52,7 @@ pub fn find_crossing(
     // Tolerances
     let tlf = tlr * up; // function tolerance
     let tla = tlr; // parameter tolerance
+    let fmin_delta = 0.01 * up;
 
     // --- Phase 1: Check limits ---
     let p = minimum.user_state().parameter(par);
@@ -68,13 +70,13 @@ pub fn find_crossing(
     // --- Phase 2: First Migrad at pmid ---
     let migrad_result = run_migrad_fixed(fcn, minimum, par, pmid, &mgr_strategy, mgr_tlr, maxcalls);
 
-    let nfcn_total = migrad_result.nfcn();
+    let mut nfcn_total = migrad_result.nfcn();
     if !migrad_result.is_valid() {
         return MnCross::invalid(nfcn_total);
     }
 
     // Check if we found a new minimum
-    if migrad_result.fval() < fmin - 0.01 * up {
+    if is_new_minimum(migrad_result.fval(), fmin, fmin_delta) {
         let state = migrad_result.user_state().clone();
         return MnCross::new_minimum_found(state, nfcn_total);
     }
@@ -98,13 +100,13 @@ pub fn find_crossing(
     // --- Phase 4: Second Migrad ---
     let p1 = pmid + aopt * pdir;
     let migrad2 = run_migrad_fixed(fcn, minimum, par, p1, &mgr_strategy, mgr_tlr, maxcalls);
-    let nfcn_total = nfcn_total + migrad2.nfcn();
+    nfcn_total += migrad2.nfcn();
 
     if !migrad2.is_valid() {
         return MnCross::invalid(nfcn_total);
     }
 
-    if migrad2.fval() < fmin - 0.01 * up {
+    if is_new_minimum(migrad2.fval(), fmin, fmin_delta) {
         let state = migrad2.user_state().clone();
         return MnCross::new_minimum_found(state, nfcn_total);
     }
@@ -117,8 +119,6 @@ pub fn find_crossing(
     let a_left = a0;
     let mut f_right = f1;
     let mut a_right = a1;
-    let mut nfcn_total = nfcn_total;
-
     // dfda = (f1 - f0) / (a1 - a0)
     let mut dfda = if (a1 - a0).abs() > 1e-15 {
         (f1 - f0) / (a1 - a0)
@@ -134,13 +134,8 @@ pub fn find_crossing(
         let p_try = pmid + a_right * pdir;
 
         // Check limits
-        if limset {
-            if pdir > 0.0 && p.has_upper_limit() && p_try > p.upper_limit() {
-                return MnCross::limit_reached(nfcn_total);
-            }
-            if pdir < 0.0 && p.has_lower_limit() && p_try < p.lower_limit() {
-                return MnCross::limit_reached(nfcn_total);
-            }
+        if limset && at_limit(pdir, p, p_try) {
+            return MnCross::limit_reached(nfcn_total);
         }
 
         let mgr = run_migrad_fixed(fcn, minimum, par, p_try, &mgr_strategy, mgr_tlr, maxcalls);
@@ -149,7 +144,7 @@ pub fn find_crossing(
         if !mgr.is_valid() {
             return MnCross::invalid(nfcn_total);
         }
-        if mgr.fval() < fmin - 0.01 * up {
+        if is_new_minimum(mgr.fval(), fmin, fmin_delta) {
             let state = mgr.user_state().clone();
             return MnCross::new_minimum_found(state, nfcn_total);
         }
@@ -175,7 +170,7 @@ pub fn find_crossing(
     if !mgr_cross.is_valid() {
         return MnCross::invalid(nfcn_total);
     }
-    if mgr_cross.fval() < fmin - 0.01 * up {
+    if is_new_minimum(mgr_cross.fval(), fmin, fmin_delta) {
         let state = mgr_cross.user_state().clone();
         return MnCross::new_minimum_found(state, nfcn_total);
     }
@@ -254,13 +249,8 @@ pub fn find_crossing(
         let p_try = pmid + a_cross * pdir;
 
         // Check limits
-        if limset {
-            if pdir > 0.0 && p.has_upper_limit() && p_try > p.upper_limit() {
-                return MnCross::limit_reached(nfcn_total);
-            }
-            if pdir < 0.0 && p.has_lower_limit() && p_try < p.lower_limit() {
-                return MnCross::limit_reached(nfcn_total);
-            }
+        if limset && at_limit(pdir, p, p_try) {
+            return MnCross::limit_reached(nfcn_total);
         }
 
         let mgr = run_migrad_fixed(fcn, minimum, par, p_try, &mgr_strategy, mgr_tlr, maxcalls);
@@ -269,7 +259,7 @@ pub fn find_crossing(
         if !mgr.is_valid() {
             return MnCross::invalid(nfcn_total);
         }
-        if mgr.fval() < fmin - 0.01 * up {
+        if is_new_minimum(mgr.fval(), fmin, fmin_delta) {
             let state = mgr.user_state().clone();
             return MnCross::new_minimum_found(state, nfcn_total);
         }
@@ -331,31 +321,39 @@ fn run_migrad_fixed(
     for i in 0..nparams {
         let p = user_state.parameter(i);
         let val = if i == fix_par { fix_val } else { p.value() };
-        let err = p.error();
-
-        if p.has_limits() {
-            builder = builder.add_limited(p.name(), val, err, p.lower_limit(), p.upper_limit());
-        } else if p.has_lower_limit() {
-            builder = builder.add_lower_limited(p.name(), val, err, p.lower_limit());
-        } else if p.has_upper_limit() {
-            builder = builder.add_upper_limited(p.name(), val, err, p.upper_limit());
-        } else if p.is_const() {
-            builder = builder.add_const(p.name(), val);
-        } else {
-            builder = builder.add(p.name(), val, err.max(1e-10));
-        }
-    }
-
-    // Fix the scan parameter
-    builder = builder.fix(fix_par);
-
-    // Also fix any parameters that were fixed in the original
-    for i in 0..nparams {
-        if i != fix_par && user_state.parameter(i).is_fixed() && !user_state.parameter(i).is_const()
-        {
+        builder = add_parameter_to_builder(builder, p, val);
+        if i != fix_par && p.is_fixed() && !p.is_const() {
             builder = builder.fix(i);
         }
     }
 
+    // Fix the scan parameter.
+    builder = builder.fix(fix_par);
+
     builder.minimize(fcn)
+}
+
+fn at_limit(pdir: f64, p: &MinuitParameter, val: f64) -> bool {
+    (pdir > 0.0 && p.has_upper_limit() && val > p.upper_limit())
+        || (pdir < 0.0 && p.has_lower_limit() && val < p.lower_limit())
+}
+
+fn is_new_minimum(fval: f64, fmin: f64, fmin_delta: f64) -> bool {
+    fval < fmin - fmin_delta
+}
+
+fn add_parameter_to_builder(mut builder: MnMigrad, p: &MinuitParameter, val: f64) -> MnMigrad {
+    let err = p.error();
+    if p.has_limits() {
+        builder = builder.add_limited(p.name(), val, err, p.lower_limit(), p.upper_limit());
+    } else if p.has_lower_limit() {
+        builder = builder.add_lower_limited(p.name(), val, err, p.lower_limit());
+    } else if p.has_upper_limit() {
+        builder = builder.add_upper_limited(p.name(), val, err, p.upper_limit());
+    } else if p.is_const() {
+        builder = builder.add_const(p.name(), val);
+    } else {
+        builder = builder.add(p.name(), val, err.max(1e-10));
+    }
+    builder
 }

@@ -39,22 +39,8 @@ impl<'a, F: FCN + ?Sized> MnParameterScan<'a, F> {
         high: f64,
     ) -> Vec<(f64, f64)> {
         let (nsteps, low, high, values) = self.setup_scan(par, nsteps, low, high);
-        let step = (high - low) / nsteps as f64;
-        let mut result = Vec::with_capacity(nsteps + 1);
-
-        for i in 0..=nsteps {
-            let x = low + i as f64 * step;
-            let mut pars = values.clone();
-            pars[par] = x;
-            let f = self.fcn.value(&pars);
-            result.push((x, f));
-
-            // Track minimum
-            if f < self.fval {
-                self.fval = f;
-                self.params.set_value(par, x);
-            }
-        }
+        let result = self.scan_points(par, nsteps, low, high, values.as_slice());
+        self.update_best(par, &result);
 
         result
     }
@@ -72,26 +58,62 @@ impl<'a, F: FCN + ?Sized> MnParameterScan<'a, F> {
         F: Sync,
     {
         let (nsteps, low, high, values) = self.setup_scan(par, nsteps, low, high);
-        let step = (high - low) / nsteps as f64;
+        let result = self.scan_points_parallel(par, nsteps, low, high, values.as_slice());
+        self.update_best(par, &result);
 
-        let result: Vec<(f64, f64)> = (0..=nsteps)
-            .into_par_iter()
-            .map(|i| {
-                let x = low + i as f64 * step;
-                let mut pars = values.clone();
-                pars[par] = x;
-                (x, self.fcn.value(&pars))
-            })
-            .collect();
+        result
+    }
 
+    fn update_best(&mut self, par: usize, result: &[(f64, f64)]) {
         if let Some((x_best, f_best)) = result.iter().copied().min_by(|a, b| a.1.total_cmp(&b.1))
             && f_best < self.fval
         {
             self.fval = f_best;
             self.params.set_value(par, x_best);
         }
+    }
 
-        result
+    fn scan_points(
+        &self,
+        par: usize,
+        nsteps: usize,
+        low: f64,
+        high: f64,
+        values: &[f64],
+    ) -> Vec<(f64, f64)> {
+        let step = (high - low) / nsteps as f64;
+        (0..=nsteps)
+            .map(|i| self.scan_point(par, low + i as f64 * step, values))
+            .collect()
+    }
+
+    fn scan_point(&self, par: usize, x: f64, values: &[f64]) -> (f64, f64) {
+        let mut pars = values.to_vec();
+        pars[par] = x;
+        let f = self.fcn.value(&pars);
+        (x, f)
+    }
+
+    #[cfg(feature = "parallel")]
+    fn scan_points_parallel(
+        &self,
+        par: usize,
+        nsteps: usize,
+        low: f64,
+        high: f64,
+        values: &[f64],
+    ) -> Vec<(f64, f64)>
+    where
+        F: Sync,
+    {
+        let step = (high - low) / nsteps as f64;
+        (0..=nsteps)
+            .into_par_iter()
+            .map(|i| {
+                let x = low + i as f64 * step;
+                self.scan_point(par, x, values)
+            })
+            .collect()
     }
 
     fn setup_scan(
@@ -107,34 +129,25 @@ impl<'a, F: FCN + ?Sized> MnParameterScan<'a, F> {
         let err = p.error();
 
         let (low, high) = if (low - high).abs() < 1e-15 {
-            // Auto-range: +/- 2*error
             let lo = val - 2.0 * err;
             let hi = val + 2.0 * err;
-
-            // Clamp to limits
-            let lo = if p.has_lower_limit() {
-                lo.max(p.lower_limit())
-            } else {
-                lo
-            };
-            let hi = if p.has_upper_limit() {
-                hi.min(p.upper_limit())
-            } else {
-                hi
-            };
-            (lo, hi)
+            self.clamp_scan_bounds(
+                lo,
+                hi,
+                p.has_lower_limit(),
+                p.lower_limit(),
+                p.has_upper_limit(),
+                p.upper_limit(),
+            )
         } else {
-            let lo = if p.has_lower_limit() {
-                low.max(p.lower_limit())
-            } else {
-                low
-            };
-            let hi = if p.has_upper_limit() {
-                high.min(p.upper_limit())
-            } else {
-                high
-            };
-            (lo, hi)
+            self.clamp_scan_bounds(
+                low,
+                high,
+                p.has_lower_limit(),
+                p.lower_limit(),
+                p.has_upper_limit(),
+                p.upper_limit(),
+            )
         };
 
         // Build parameter vector at minimum
@@ -201,26 +214,45 @@ impl<'a, F: FCN + ?Sized> MnScan<'a, F> {
 
         let mut params = MnUserParameters::new();
         for i in 0..nparams {
-            let p = user_state.parameter(i);
-            if p.has_limits() {
-                params.add_limited(
-                    p.name(),
-                    p.value(),
-                    p.error(),
-                    p.lower_limit(),
-                    p.upper_limit(),
-                );
-            } else if p.has_lower_limit() {
-                params.add_lower_limited(p.name(), p.value(), p.error(), p.lower_limit());
-            } else if p.has_upper_limit() {
-                params.add_upper_limited(p.name(), p.value(), p.error(), p.upper_limit());
-            } else if p.is_const() {
-                params.add_const(p.name(), p.value());
-            } else {
-                params.add(p.name(), p.value(), p.error());
-            }
+            add_param_from_state(&mut params, user_state.parameter(i));
         }
 
         params
+    }
+}
+
+fn add_param_from_state(params: &mut MnUserParameters, p: &crate::parameter::MinuitParameter) {
+    if p.has_limits() {
+        params.add_limited(
+            p.name(),
+            p.value(),
+            p.error(),
+            p.lower_limit(),
+            p.upper_limit(),
+        );
+    } else if p.has_lower_limit() {
+        params.add_lower_limited(p.name(), p.value(), p.error(), p.lower_limit());
+    } else if p.has_upper_limit() {
+        params.add_upper_limited(p.name(), p.value(), p.error(), p.upper_limit());
+    } else if p.is_const() {
+        params.add_const(p.name(), p.value());
+    } else {
+        params.add(p.name(), p.value(), p.error());
+    }
+}
+
+impl<F: FCN + ?Sized> MnParameterScan<'_, F> {
+    fn clamp_scan_bounds(
+        &self,
+        low: f64,
+        high: f64,
+        has_lower: bool,
+        lower: f64,
+        has_upper: bool,
+        upper: f64,
+    ) -> (f64, f64) {
+        let low = if has_lower { low.max(lower) } else { low };
+        let high = if has_upper { high.min(upper) } else { high };
+        (low, high)
     }
 }

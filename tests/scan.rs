@@ -55,7 +55,7 @@ fn scan_minimum_tracking() {
     use minuit2::scan::MnParameterScan;
     use minuit2::user_parameters::MnUserParameters;
 
-    // Start far from minimum
+    // Start far from minimum.
     let mut params = MnUserParameters::new();
     params.add("x", 10.0, 1.0);
 
@@ -65,13 +65,43 @@ fn scan_minimum_tracking() {
     let mut scanner = MnParameterScan::new(&fcn, params, initial_fval);
     let _points = scanner.scan(0, 50, 0.0, 6.0);
 
-    // Scanner should have found a better point near x=3
+    // Scanner should have found a better point near x=3.
     assert!(
         scanner.fval() < initial_fval,
-        "scanner should find better fval: {} < {}",
-        scanner.fval(),
-        initial_fval
+        "scanner should find better fval"
     );
+    assert!(
+        (scanner
+            .params()
+            .value("x")
+            .expect("parameter x should exist")
+            - 3.0)
+            .abs()
+            < 0.5,
+        "tracked minimum should move from 10 to near 3"
+    );
+}
+
+/// nsteps is clamped to [2, 101], and bounded scan ranges are clamped to limits.
+#[test]
+fn scan_range_and_step_clamping() {
+    let result = MnMigrad::new()
+        .add_limited("x", 3.0, 1.0, 0.0, 2.0)
+        .add("y", -1.0, 1.0)
+        .minimize(&|p: &[f64]| (p[0] - 1.0).powi(2) + p[1] * p[1]);
+
+    assert!(result.is_valid());
+
+    let scan = MnScan::new(&|p: &[f64]| (p[0] - 1.0).powi(2) + p[1] * p[1], &result);
+
+    // nsteps is clamped below range to 2.
+    let points = scan.scan(0, 0, -10.0, 10.0);
+    assert_eq!(points.len(), 3);
+
+    let x_min = points.iter().map(|v| v.0).fold(f64::INFINITY, f64::min);
+    let x_max = points.iter().map(|v| v.0).fold(f64::NEG_INFINITY, f64::max);
+    assert!((x_min - 0.0).abs() < 1e-12);
+    assert!((x_max - 2.0).abs() < 1e-12);
 }
 
 /// `scan()` and `scan_serial()` should be equivalent.

@@ -11,6 +11,7 @@ pub mod minos_error;
 pub use cross::MnCross;
 pub use minos_error::MinosError;
 
+use crate::application::default_max_fcn;
 use crate::fcn::FCN;
 use crate::minimum::FunctionMinimum;
 use crate::strategy::MnStrategy;
@@ -99,7 +100,7 @@ impl<'a> MnMinos<'a> {
     pub fn find_cross_value(&self, dir: i32, par: usize, maxcalls: usize, toler: f64) -> MnCross {
         let direction = if dir < 0 { -1.0 } else { 1.0 };
         let nvar = self.minimum.n_variable_params();
-        let default_calls = 2 * (nvar + 1) * (200 + 100 * nvar + 5 * nvar * nvar);
+        let default_calls = default_cross_calls(nvar);
         let maxcalls = if maxcalls == 0 {
             default_calls
         } else {
@@ -126,9 +127,7 @@ impl<'a> MnMinos<'a> {
 
     fn find_crossing(&self, par: usize, direction: f64) -> MnCross {
         let nvar = self.minimum.n_variable_params();
-        let maxcalls = self
-            .max_calls
-            .unwrap_or(2 * (nvar + 1) * (200 + 100 * nvar + 5 * nvar * nvar));
+        let maxcalls = self.max_calls.unwrap_or_else(|| default_cross_calls(nvar));
 
         let user_state = self.minimum.user_state();
         let p = user_state.parameter(par);
@@ -148,7 +147,6 @@ impl<'a> MnMinos<'a> {
 
         // Check limits
         if direction > 0.0 && p.has_upper_limit() && pmid > p.upper_limit() {
-            pmid_at_limit(val, p.upper_limit(), direction);
             let pmid = p.upper_limit() - 1e-6 * (p.upper_limit() - val).abs().max(1e-10);
             return function_cross::find_crossing(
                 self.fcn,
@@ -189,6 +187,6 @@ impl<'a> MnMinos<'a> {
     }
 }
 
-fn pmid_at_limit(_val: f64, _limit: f64, _direction: f64) {
-    // Intentional no-op: limit handling is done after this call
+fn default_cross_calls(nvar: usize) -> usize {
+    2 * (nvar + 1) * default_max_fcn(nvar)
 }

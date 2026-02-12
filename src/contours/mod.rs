@@ -10,6 +10,7 @@ pub use contours_error::ContoursError;
 use crate::fcn::FCN;
 use crate::minimum::FunctionMinimum;
 use crate::minos::MnMinos;
+use crate::minos::minos_error::MinosError;
 use crate::strategy::MnStrategy;
 
 /// Compute 2D confidence contours.
@@ -47,11 +48,7 @@ impl<'a> MnContours<'a> {
         let up = self.minimum.up();
         let user_state = self.minimum.user_state();
 
-        // Get MINOS errors for both parameters
-        let minos = MnMinos::new(self.fcn, self.minimum).with_strategy(self.strategy.strategy());
-
-        let x_minos = minos.minos_error(par_x);
-        let y_minos = minos.minos_error(par_y);
+        let (x_minos, y_minos) = self.minos_errors(par_x, par_y);
 
         if !x_minos.is_valid() || !y_minos.is_valid() {
             return Vec::new();
@@ -174,9 +171,7 @@ impl<'a> MnContours<'a> {
 
     /// Compute full contour with MINOS errors for both axes.
     pub fn contour(&self, par_x: usize, par_y: usize, npoints: usize) -> ContoursError {
-        let minos = MnMinos::new(self.fcn, self.minimum).with_strategy(self.strategy.strategy());
-        let x_minos = minos.minos_error(par_x);
-        let y_minos = minos.minos_error(par_y);
+        let (x_minos, y_minos) = self.minos_errors(par_x, par_y);
 
         let pts = self.points(par_x, par_y, npoints);
 
@@ -188,5 +183,11 @@ impl<'a> MnContours<'a> {
             y_minos,
             nfcn: 0,
         }
+    }
+
+    fn minos_errors(&self, par_x: usize, par_y: usize) -> (MinosError, MinosError) {
+        let minos = MnMinos::new(self.fcn, self.minimum).with_strategy(self.strategy.strategy());
+
+        (minos.minos_error(par_x), minos.minos_error(par_y))
     }
 }

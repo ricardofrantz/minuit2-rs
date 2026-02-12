@@ -129,3 +129,24 @@ fn minos_fixed_parameter() {
         "min() should still return a finite original parameter value"
     );
 }
+
+#[test]
+fn minos_upper_bound_reports_limit() {
+    let result = MnMigrad::new()
+        .add_upper_limited("x", -1.0, 0.5, -0.5)
+        .minimize(&|p: &[f64]| (p[0] + 1.0).powi(2));
+
+    assert!(result.is_valid());
+
+    let minos = MnMinos::new(&|p: &[f64]| (p[0] + 1.0).powi(2), &result);
+    let me = minos.minos_error(0);
+
+    assert!((me.min() + 1.0).abs() < 1e-12);
+    assert!(
+        me.at_upper_limit(),
+        "upper crossing should be at parameter limit"
+    );
+    assert!(!me.lower_new_min());
+    assert!(!me.upper_new_min());
+    assert!(me.nfcn() > 0);
+}

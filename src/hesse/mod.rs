@@ -8,6 +8,7 @@
 pub mod calculator;
 pub mod gradient;
 
+use crate::application::default_max_fcn;
 use crate::fcn::FCN;
 use crate::global_cc::global_correlation_coefficients;
 use crate::minimum::FunctionMinimum;
@@ -61,7 +62,7 @@ impl MnHesse {
     pub fn calculate(&self, fcn: &dyn FCN, minimum: &FunctionMinimum) -> FunctionMinimum {
         let trafo = minimum.seed().trafo();
         let n = trafo.variable_parameters();
-        let maxcalls = self.max_calls.unwrap_or(200 + 100 * n + 5 * n * n);
+        let maxcalls = self.max_calls.unwrap_or_else(|| default_max_fcn(n));
 
         let mn_fcn = MnFcn::new(fcn, trafo);
         let state = minimum.state();
@@ -95,7 +96,7 @@ impl MnHesse {
     ) -> MnUserParameterState {
         let trafo = minimum.seed().trafo();
         let n = trafo.variable_parameters();
-        let maxcalls = self.max_calls.unwrap_or(200 + 100 * n + 5 * n * n);
+        let maxcalls = self.max_calls.unwrap_or_else(|| default_max_fcn(n));
 
         let mn_fcn = MnFcn::new(fcn, trafo);
         let state = minimum.state();

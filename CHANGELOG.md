@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-02-12
+
+### Added
+
+- ROOT v6-36-08 verification harness with parity baseline for cross-validation
+- Executed-surface gate with expanded verification workloads
+- Scientific demonstration examples (Rosenbrock, Himmelbayas, Rastrigin, sphere functions)
+- Fair solver benchmark workflow with automated artifact refresh
+
+### Changed
+
+- Internal refactoring: tightened executed-surface mapping and reduced false positives
+- Enhanced `MnMinimize` internal logic and state handling
+- Improved `MnScan`, `MnContours`, and `MnMinos` internal implementations
+- Expanded test coverage (93 tests, up from 92)
+
+### Fixed
+
+- Security: upgraded PyO3 0.23 → 0.28 to resolve RUSTSEC-2025-0020
+- Resolved all clippy warnings for clean CI lint gate
+- Corrected two API errors in README examples
+- Applied cargo fmt across entire codebase
+
+### CI/CD
+
+- Added scheduled scientific benchmark workflow with auto-commit to master
+- Removed main branch alias, targeting master only
+- Finalized examples cleanup for cleaner CI workflow
+
+### Docs
+
+- Expanded README with comprehensive user guide integrating DOC.md content
+- Added verification snapshot and developer guide sections
+
 ## [0.4.0] - 2026-02-09
 
 ### Added
@@ -64,7 +98,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `MnStrategy` (low/medium/high optimization presets)
 - `nalgebra` for all linear algebra
 
-[Unreleased]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.1.0...v0.2.0

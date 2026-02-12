@@ -1,24 +1,26 @@
 {
-  "timestamp_utc": "2026-02-12T05:45:30.787009+00:00",
-  "platform": "Linux-6.11.0-1018-azure-x86_64-with-glibc2.39",
-  "system": "Linux",
-  "release": "6.11.0-1018-azure",
-  "machine": "x86_64",
-  "python": "3.12.12",
+  "timestamp_utc": "2026-02-12T21:18:25.206747+00:00",
+  "platform": "macOS-26.2-arm64-arm-64bit-Mach-O",
+  "system": "Darwin",
+  "release": "25.2.0",
+  "machine": "arm64",
+  "python": "3.14.1",
   "cpu_affinity": {
     "requested_core": null,
     "method": "none",
-    "taskset_available": true
+    "taskset_available": false
   },
-  "linux": {
-    "cpu_model": "AMD EPYC 7763 64-Core Processor",
-    "governors": [],
-    "intel_pstate_no_turbo": null
+  "darwin": {
+    "cpu_brand": "Apple M1 Pro",
+    "ncpu": "8",
+    "perflevel0_physicalcpu": "6",
+    "lowpowermode": 0,
+    "power_source": "Now drawing from 'AC Power'"
   },
   "loadavg": {
-    "1min": 10.46484375,
-    "5min": 3.0927734375,
-    "15min": 1.08203125
+    "1min": 61.89453125,
+    "5min": 45.29150390625,
+    "15min": 32.83203125
   },
   "benchmark_config": {
     "repeats_per_batch": 41,
@@ -29,8 +31,6 @@
     "permutation_iters": 10000,
     "seed": 20260211
   },
-  "warnings": [
-    "Linux governor not readable; cannot verify fixed-frequency policy."
-  ],
+  "warnings": [],
   "critical_issues": []
 }

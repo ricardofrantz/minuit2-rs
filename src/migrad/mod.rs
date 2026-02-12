@@ -8,7 +8,7 @@ pub mod builder;
 pub mod minimizer;
 pub mod seed;
 
-use crate::application::DEFAULT_TOLERANCE;
+use crate::application::{DEFAULT_TOLERANCE, default_max_fcn};
 use crate::fcn::{FCN, FCNGradient};
 use crate::minimum::FunctionMinimum;
 use crate::mn_fcn::MnFcn;
@@ -112,7 +112,7 @@ impl MnMigrad {
     /// Run the minimization with numerical gradients (default).
     pub fn minimize(&self, fcn: &dyn FCN) -> FunctionMinimum {
         let n = self.params.variable_parameters();
-        let max_fcn = self.max_fcn.unwrap_or(200 + 100 * n + 5 * n * n);
+        let max_fcn = self.max_fcn.unwrap_or_else(|| default_max_fcn(n));
         let trafo = self.params.trafo().clone();
 
         let mn_fcn = MnFcn::new(fcn, &trafo);
@@ -131,7 +131,7 @@ impl MnMigrad {
     /// This typically requires fewer function evaluations than numerical differentiation.
     pub fn minimize_grad(&self, fcn: &dyn FCNGradient) -> FunctionMinimum {
         let n = self.params.variable_parameters();
-        let max_fcn = self.max_fcn.unwrap_or(200 + 100 * n + 5 * n * n);
+        let max_fcn = self.max_fcn.unwrap_or_else(|| default_max_fcn(n));
         let trafo = self.params.trafo().clone();
 
         minimizer::VariableMetricMinimizer::minimize_with_gradient(

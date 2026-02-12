@@ -36,13 +36,12 @@ impl<'a> MnFcn<'a> {
 
     /// Evaluate an FCN with already transformed (external) parameters.
     pub fn call_with_transformed_params(&self, external: &[f64]) -> f64 {
-        self.num_calls.set(self.num_calls.get() + 1);
-        self.fcn.value(external)
+        self.call_external(external)
     }
 
     /// Evaluate without applying the internal->external transformation.
     pub fn call_without_doing_trafo(&self, external: &[f64]) -> f64 {
-        self.call_with_transformed_params(external)
+        self.call_external(external)
     }
 
     /// Get the total number of function calls made.
@@ -57,6 +56,11 @@ impl<'a> MnFcn<'a> {
 
     /// Get the Up value (error definition).
     pub fn up(&self) -> f64 {
-        self.fcn.error_def()
+        self.error_def()
+    }
+
+    fn call_external(&self, external: &[f64]) -> f64 {
+        self.num_calls.set(self.num_calls.get() + 1);
+        self.fcn.value(external)
     }
 }

@@ -216,9 +216,21 @@ def collect_environment(cpu_core: int | None, strict_env: bool) -> tuple[dict[st
         rc_custom, out_custom, _ = run_capture(["pmset", "-g", "custom"])
         low_power_mode = None
         if rc_custom == 0:
-            m = re.search(r"lowpowermode\s+(\d)", out_custom)
-            if m:
-                low_power_mode = int(m.group(1))
+            section = None
+            for raw_line in out_custom.splitlines():
+                line = raw_line.strip()
+                if line.endswith(":"):
+                    section = line[:-1]
+                    continue
+                if section == "AC Power":
+                    m = re.search(r"lowpowermode\s+(\d)", line)
+                    if m:
+                        low_power_mode = int(m.group(1))
+                        break
+            if low_power_mode is None:
+                m = re.search(r"lowpowermode\s+(\d)", out_custom)
+                if m:
+                    low_power_mode = int(m.group(1))
 
         rc_batt, out_batt, _ = run_capture(["pmset", "-g", "batt"])
         power_source = first_non_empty_line(out_batt) if rc_batt == 0 else ""

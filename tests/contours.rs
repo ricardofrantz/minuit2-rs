@@ -1,3 +1,4 @@
+use minuit2::MnMinos;
 use minuit2::{MnContours, MnHesse, MnMigrad};
 
 /// 2D quadratic: contour points should form approximate ellipse.
@@ -75,4 +76,60 @@ fn contour_correlated() {
     // Check that at least one point has both x and y non-zero
     let off_axis = points.iter().any(|(x, y)| x.abs() > 0.01 && y.abs() > 0.01);
     assert!(off_axis, "correlated contour should have off-axis points");
+}
+
+#[test]
+fn contours_points_respect_minimum_cardinal_count() {
+    let result = MnMigrad::new()
+        .add("x", 5.0, 1.0)
+        .add("y", -3.0, 1.0)
+        .minimize(&|p: &[f64]| 2.0 * p[0] * p[0] + 8.0 * p[1] * p[1]);
+
+    assert!(result.is_valid());
+
+    let hesse_result =
+        MnHesse::new().calculate(&|p: &[f64]| 2.0 * p[0] * p[0] + 8.0 * p[1] * p[1], &result);
+    let contours = MnContours::new(
+        &|p: &[f64]| 2.0 * p[0] * p[0] + 8.0 * p[1] * p[1],
+        &hesse_result,
+    );
+
+    let points = contours.points(0, 1, 2);
+    assert_eq!(points.len(), 4);
+
+    let x_min = hesse_result.user_state().parameter(0).value();
+    let y_min = hesse_result.user_state().parameter(1).value();
+
+    let minos = MnMinos::new(
+        &|p: &[f64]| 2.0 * p[0] * p[0] + 8.0 * p[1] * p[1],
+        &hesse_result,
+    );
+    let x_minos = minos.minos_error(0);
+    let y_minos = minos.minos_error(1);
+
+    assert!((points[0].0 - (x_min + x_minos.upper_error())).abs() < 1e-8);
+    assert!((points[2].0 - (x_min + x_minos.lower_error())).abs() < 1e-8);
+    assert!((points[1].1 - (y_min + y_minos.upper_error())).abs() < 1e-8);
+    assert!((points[3].1 - (y_min + y_minos.lower_error())).abs() < 1e-8);
+}
+
+#[test]
+fn contour_contains_same_points_as_points_call() {
+    let result = MnMigrad::new()
+        .add("x", 5.0, 1.0)
+        .add("y", -3.0, 1.0)
+        .minimize(&|p: &[f64]| 2.0 * p[0] * p[0] + 8.0 * p[1] * p[1]);
+
+    assert!(result.is_valid());
+
+    let hesse_result =
+        MnHesse::new().calculate(&|p: &[f64]| 2.0 * p[0] * p[0] + 8.0 * p[1] * p[1], &result);
+    let contours = MnContours::new(
+        &|p: &[f64]| 2.0 * p[0] * p[0] + 8.0 * p[1] * p[1],
+        &hesse_result,
+    );
+
+    let points = contours.points(0, 1, 12);
+    let contour = contours.contour(0, 1, 12);
+    assert_eq!(points, contour.points);
 }

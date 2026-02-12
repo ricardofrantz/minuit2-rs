@@ -1,3 +1,5 @@
+mod common;
+
 use minuit2::{FCN, MnSimplex};
 
 /// Rosenbrock function: f(x,y) = (1-x)^2 + 100(y-x^2)^2
@@ -174,8 +176,5 @@ fn display_output() {
         .add("x", 1.0, 0.1)
         .minimize(&|p: &[f64]| p[0] * p[0]);
 
-    let output = format!("{result}");
-    assert!(output.contains("FunctionMinimum"));
-    assert!(output.contains("fval"));
-    assert!(output.contains("x"));
+    common::assert_function_minimum_display(&result, &["x"]);
 }

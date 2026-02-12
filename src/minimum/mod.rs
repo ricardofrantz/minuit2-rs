@@ -88,67 +88,21 @@ impl FunctionMinimum {
         for (i, p) in trafo.parameters().iter().enumerate() {
             if p.is_const() {
                 uparams.add_const(p.name(), p.value());
-            } else if p.is_fixed() {
-                if p.has_limits() {
-                    uparams.add_limited(
-                        p.name(),
-                        p.value(),
-                        p.error(),
-                        p.lower_limit(),
-                        p.upper_limit(),
-                    );
-                } else if p.has_lower_limit() {
-                    uparams.add_lower_limited(p.name(), p.value(), p.error(), p.lower_limit());
-                } else if p.has_upper_limit() {
-                    uparams.add_upper_limited(p.name(), p.value(), p.error(), p.upper_limit());
-                } else {
-                    uparams.add(p.name(), p.value(), p.error());
-                }
-                uparams.fix(i);
-            } else if p.has_limits() {
-                let err = if cov_is_valid {
-                    let int_i = trafo
-                        .int_of_ext(i)
-                        .expect("variable parameter must map to internal index");
-                    let sigma_int = (2.0 * up * last.error().matrix()[(int_i, int_i)]).sqrt();
-                    trafo.int2ext_error(i, internal[int_i], sigma_int)
-                } else {
-                    p.error()
-                };
-                uparams.add_limited(p.name(), external[i], err, p.lower_limit(), p.upper_limit());
-            } else if p.has_lower_limit() {
-                let err = if cov_is_valid {
-                    let int_i = trafo
-                        .int_of_ext(i)
-                        .expect("variable parameter must map to internal index");
-                    let sigma_int = (2.0 * up * last.error().matrix()[(int_i, int_i)]).sqrt();
-                    trafo.int2ext_error(i, internal[int_i], sigma_int)
-                } else {
-                    p.error()
-                };
-                uparams.add_lower_limited(p.name(), external[i], err, p.lower_limit());
-            } else if p.has_upper_limit() {
-                let err = if cov_is_valid {
-                    let int_i = trafo
-                        .int_of_ext(i)
-                        .expect("variable parameter must map to internal index");
-                    let sigma_int = (2.0 * up * last.error().matrix()[(int_i, int_i)]).sqrt();
-                    trafo.int2ext_error(i, internal[int_i], sigma_int)
-                } else {
-                    p.error()
-                };
-                uparams.add_upper_limited(p.name(), external[i], err, p.upper_limit());
-            } else {
-                let err = if cov_is_valid {
-                    let int_i = trafo
-                        .int_of_ext(i)
-                        .expect("variable parameter must map to internal index");
-                    (2.0 * up * last.error().matrix()[(int_i, int_i)]).sqrt()
-                } else {
-                    p.error()
-                };
-                uparams.add(p.name(), external[i], err);
+                continue;
             }
+
+            if p.is_fixed() {
+                Self::add_parameter_from_state(&mut uparams, p, p.value(), p.error());
+                uparams.fix(i);
+                continue;
+            }
+
+            let err = if cov_is_valid {
+                Self::transformed_error(trafo, i, internal, last, up)
+            } else {
+                p.error()
+            };
+            Self::add_parameter_from_state(&mut uparams, p, external[i], err);
         }
 
         let mut state = MnUserParameterState::new(uparams);
@@ -170,6 +124,37 @@ impl FunctionMinimum {
             state.set_global_cc(gcc);
         }
         state
+    }
+
+    fn add_parameter_from_state(
+        params: &mut MnUserParameters,
+        p: &crate::parameter::MinuitParameter,
+        value: f64,
+        error: f64,
+    ) {
+        if p.has_limits() {
+            params.add_limited(p.name(), value, error, p.lower_limit(), p.upper_limit());
+        } else if p.has_lower_limit() {
+            params.add_lower_limited(p.name(), value, error, p.lower_limit());
+        } else if p.has_upper_limit() {
+            params.add_upper_limited(p.name(), value, error, p.upper_limit());
+        } else {
+            params.add(p.name(), value, error);
+        }
+    }
+
+    fn transformed_error(
+        trafo: &crate::user_transformation::MnUserTransformation,
+        i: usize,
+        internal: &[f64],
+        last: &MinimumState,
+        up: f64,
+    ) -> f64 {
+        let int_i = trafo
+            .int_of_ext(i)
+            .expect("variable parameter must map to internal index");
+        let sigma_int = (2.0 * up * last.error().matrix()[(int_i, int_i)]).sqrt();
+        trafo.int2ext_error(i, internal[int_i], sigma_int)
     }
 
     // --- Accessors ---

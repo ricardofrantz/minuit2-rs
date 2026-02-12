@@ -1,4 +1,10 @@
-use minuit2::{FCN, MnMigrad, MnSimplex};
+use nalgebra::DVector;
+mod common;
+
+use minuit2::{
+    FCN, FunctionMinimum, MinuitParameter, MnMigrad, MnSimplex, MnUserTransformation,
+    minimum::{parameters::MinimumParameters, seed::MinimumSeed, state::MinimumState},
+};
 
 /// Rosenbrock function: f(x,y) = (1-x)^2 + 100(y-x^2)^2
 /// Minimum at (1, 1) with f = 0.
@@ -233,8 +239,59 @@ fn display_output() {
         .add("x", 1.0, 0.1)
         .minimize(&|p: &[f64]| p[0] * p[0]);
 
-    let output = format!("{result}");
-    assert!(output.contains("FunctionMinimum"));
-    assert!(output.contains("fval"));
-    assert!(output.contains("x"));
+    common::assert_function_minimum_display(&result, &["x"]);
+}
+
+#[test]
+fn display_output_marks_call_limit_warning() {
+    let params = MnUserTransformation::new(vec![MinuitParameter::new(0, "x", 0.0, 0.1)]);
+    let seed_state = MinimumState::from_params_edm(
+        MinimumParameters::new(DVector::from_vec(vec![0.0]), 0.0),
+        0.0,
+        1,
+    );
+    let seed = MinimumSeed::new(seed_state, params);
+    let minimum = FunctionMinimum::with_call_limit(
+        seed,
+        vec![MinimumState::from_params_edm(
+            MinimumParameters::new(DVector::from_vec(vec![0.0]), 0.0),
+            0.0,
+            1,
+        )],
+        1.0,
+    );
+
+    let output = format!("{minimum}");
+
+    assert!(!minimum.is_valid());
+    assert!(minimum.reached_call_limit());
+    assert!(output.contains("WARNING: call limit reached"));
+    assert!(output.contains("valid:     false"));
+}
+
+#[test]
+fn display_output_marks_above_max_edm_warning() {
+    let params = MnUserTransformation::new(vec![MinuitParameter::new(0, "x", 0.0, 0.1)]);
+    let seed_state = MinimumState::from_params_edm(
+        MinimumParameters::new(DVector::from_vec(vec![0.0]), 0.0),
+        0.0,
+        1,
+    );
+    let seed = MinimumSeed::new(seed_state, params);
+    let minimum = FunctionMinimum::above_max_edm(
+        seed,
+        vec![MinimumState::from_params_edm(
+            MinimumParameters::new(DVector::from_vec(vec![0.0]), 0.0),
+            0.0,
+            1,
+        )],
+        1.0,
+    );
+
+    let output = format!("{minimum}");
+
+    assert!(!minimum.is_valid());
+    assert!(minimum.is_above_max_edm());
+    assert!(output.contains("WARNING: EDM above maximum"));
+    assert!(output.contains("valid:     false"));
 }
