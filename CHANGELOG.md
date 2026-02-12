@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### CI/CD
+
+- Removed Miri CI job (nightly toolchain incompatibility with `quote` crate build script)
+
 ## [0.4.1] - 2026-02-12
 
 ### Added

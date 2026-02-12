@@ -863,7 +863,7 @@ Run benchmarks: `cargo bench`
 
 This crate is verified against ROOT `v6-36-08` (`math/minuit2` subsystem only). Verification is automated and runs in CI.
 
-**Current snapshot (2026-02-11):**
+**Current snapshot (2026-02-12):**
 
 | Metric | Value |
 |--------|-------|
