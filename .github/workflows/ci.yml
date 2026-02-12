@@ -96,8 +96,8 @@ jobs:
         with:
           key: miri
 
-      - name: Clean Miri target (avoid stale cache)
-        run: cargo +nightly miri clean
+      - name: Clean Miri target (avoid stale nightly cache)
+        run: rm -rf target/miri
 
       - name: Run Miri
         run: cargo +nightly miri test --lib
