@@ -1,39 +1,36 @@
 {
-  "timestamp_utc": "2026-02-11T20:54:41.767521+00:00",
-  "platform": "macOS-26.2-arm64-arm-64bit-Mach-O",
-  "system": "Darwin",
-  "release": "25.2.0",
-  "machine": "arm64",
-  "python": "3.14.1",
+  "timestamp_utc": "2026-02-12T05:45:30.787009+00:00",
+  "platform": "Linux-6.11.0-1018-azure-x86_64-with-glibc2.39",
+  "system": "Linux",
+  "release": "6.11.0-1018-azure",
+  "machine": "x86_64",
+  "python": "3.12.12",
   "cpu_affinity": {
     "requested_core": null,
     "method": "none",
-    "taskset_available": false
+    "taskset_available": true
   },
-  "darwin": {
-    "cpu_brand": "Apple M1 Pro",
-    "ncpu": "8",
-    "perflevel0_physicalcpu": "6",
-    "lowpowermode": 1,
-    "power_source": "Now drawing from 'Battery Power'"
+  "linux": {
+    "cpu_model": "AMD EPYC 7763 64-Core Processor",
+    "governors": [],
+    "intel_pstate_no_turbo": null
   },
   "loadavg": {
-    "1min": 11.47119140625,
-    "5min": 26.87255859375,
-    "15min": 45.25146484375
+    "1min": 10.46484375,
+    "5min": 3.0927734375,
+    "15min": 1.08203125
   },
   "benchmark_config": {
-    "repeats_per_batch": 5,
-    "warmups_per_batch": 2,
-    "batches": 3,
+    "repeats_per_batch": 41,
+    "warmups_per_batch": 9,
+    "batches": 9,
     "trim_fraction": 0.1,
-    "bootstrap_iters": 500,
-    "permutation_iters": 1000,
+    "bootstrap_iters": 5000,
+    "permutation_iters": 10000,
     "seed": 20260211
   },
   "warnings": [
-    "macOS Low Power Mode is enabled; this biases performance measurements.",
-    "Running on battery power; plug in for stable frequency behavior."
+    "Linux governor not readable; cannot verify fixed-frequency policy."
   ],
   "critical_issues": []
 }
