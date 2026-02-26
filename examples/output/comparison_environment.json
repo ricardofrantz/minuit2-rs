@@ -1,8 +1,8 @@
 {
-  "timestamp_utc": "2026-02-25T05:41:21.374970+00:00",
-  "platform": "Linux-6.11.0-1018-azure-x86_64-with-glibc2.39",
+  "timestamp_utc": "2026-02-26T05:37:18.260457+00:00",
+  "platform": "Linux-6.14.0-1017-azure-x86_64-with-glibc2.39",
   "system": "Linux",
-  "release": "6.11.0-1018-azure",
+  "release": "6.14.0-1017-azure",
   "machine": "x86_64",
   "python": "3.12.12",
   "cpu_affinity": {
@@ -11,14 +11,16 @@
     "taskset_available": true
   },
   "linux": {
-    "cpu_model": "AMD EPYC 7763 64-Core Processor",
-    "governors": [],
-    "intel_pstate_no_turbo": null
+    "cpu_model": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz",
+    "governors": [
+      "performance"
+    ],
+    "intel_pstate_no_turbo": "1"
   },
   "loadavg": {
-    "1min": 10.275390625,
-    "5min": 2.72021484375,
-    "15min": 0.9140625
+    "1min": 10.64111328125,
+    "5min": 2.78466796875,
+    "15min": 0.93798828125
   },
   "benchmark_config": {
     "repeats_per_batch": 41,
@@ -29,8 +31,6 @@
     "permutation_iters": 10000,
     "seed": 20260211
   },
-  "warnings": [
-    "Linux governor not readable; cannot verify fixed-frequency policy."
-  ],
+  "warnings": [],
   "critical_issues": []
 }
