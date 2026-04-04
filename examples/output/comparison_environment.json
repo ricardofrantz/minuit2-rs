@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-04-03T05:51:42.358478+00:00",
+  "timestamp_utc": "2026-04-04T05:37:53.325547+00:00",
   "platform": "Linux-6.17.0-1008-azure-x86_64-with-glibc2.39",
   "system": "Linux",
   "release": "6.17.0-1008-azure",
@@ -16,9 +16,9 @@
     "intel_pstate_no_turbo": null
   },
   "loadavg": {
-    "1min": 8.41162109375,
-    "5min": 2.1474609375,
-    "15min": 0.72412109375
+    "1min": 10.109375,
+    "5min": 2.71826171875,
+    "15min": 0.9267578125
   },
   "benchmark_config": {
     "repeats_per_batch": 41,
