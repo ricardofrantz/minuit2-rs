@@ -16,6 +16,24 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag is reachable from master
+        env:
+          TAG_SHA: ${{ github.sha }}
+          TAG_REF: ${{ github.ref_name }}
+        run: |
+          # Fail closed if the tag points at a commit that is not an ancestor
+          # of master. This ensures every release has been through the master
+          # branch (and therefore the PR / CI gate), even if an attacker with
+          # tag-push rights tries to release off a side branch.
+          git fetch --no-tags origin "+refs/heads/master:refs/remotes/origin/master"
+          if ! git merge-base --is-ancestor "$TAG_SHA" origin/master; then
+            echo "::error::tag ${TAG_REF} (${TAG_SHA}) is not reachable from origin/master; refusing to release"
+            exit 1
+          fi
+
       - name: Extract changelog for this version
         env:
           TAG: ${{ github.ref_name }}
