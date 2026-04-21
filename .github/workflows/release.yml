@@ -17,9 +17,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Extract changelog for this version
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          awk "/^## \[${VERSION}\]/{found=1; next} /^## \[/{if(found) exit} found" CHANGELOG.md > RELEASE_NOTES.md
+          VERSION="${TAG#v}"
+          # `awk -v` binds `target` as data, never program text; `index(...) == 1`
+          # is a literal prefix match (no regex interpretation of VERSION).
+          awk -v target="## [${VERSION}]" '
+            index($0, target) == 1 { found = 1; next }
+            /^## \[/               { if (found) exit }
+            found
+          ' CHANGELOG.md > RELEASE_NOTES.md
           if [ ! -s RELEASE_NOTES.md ]; then
             echo "No CHANGELOG entry for ${VERSION}, falling back to auto-generated notes." > RELEASE_NOTES.md
           fi
