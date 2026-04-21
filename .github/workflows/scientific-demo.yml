@@ -100,20 +100,42 @@ jobs:
 
       - name: Run benchmark + regenerate figures
         shell: bash
+        env:
+          REPEATS:    ${{ inputs.repeats }}
+          WARMUPS:    ${{ inputs.warmups }}
+          BOOT_ITERS: ${{ inputs.bootstrap_iters }}
+          PERM_ITERS: ${{ inputs.permutation_iters }}
+          BATCHES:    ${{ inputs.batches }}
+          CPU_CORE:   ${{ inputs.cpu_core }}
+          TRIM:       ${{ inputs.trim_fraction }}
+          STRICT_ENV: ${{ inputs.strict_env }}
         run: |
-          STRICT_ENV=0
-          if [[ "${{ inputs.strict_env }}" == "true" ]]; then
-            STRICT_ENV=1
+          # Validate user-supplied inputs before they reach the benchmark script.
+          for var in REPEATS WARMUPS BOOT_ITERS PERM_ITERS BATCHES; do
+            v="${!var}"
+            [[ "$v" =~ ^[0-9]+$ ]] \
+              || { echo "::error::$var must be a non-negative integer (got: $v)"; exit 1; }
+          done
+          [[ "$TRIM" =~ ^[0-9]+(\.[0-9]+)?$ ]] \
+            || { echo "::error::TRIM must be a decimal (got: $TRIM)"; exit 1; }
+          if [[ -n "$CPU_CORE" ]]; then
+            [[ "$CPU_CORE" =~ ^[0-9]+$ ]] \
+              || { echo "::error::CPU_CORE must be empty or a non-negative integer (got: $CPU_CORE)"; exit 1; }
+          fi
+
+          strict=0
+          if [[ "$STRICT_ENV" == "true" ]]; then
+            strict=1
           fi
           bash examples/run_comparison.sh \
-            "${{ inputs.repeats }}" \
-            "${{ inputs.warmups }}" \
-            "${{ inputs.bootstrap_iters }}" \
-            "${{ inputs.permutation_iters }}" \
-            "${{ inputs.batches }}" \
-            "${{ inputs.cpu_core }}" \
-            "${{ inputs.trim_fraction }}" \
-            "${STRICT_ENV}"
+            "$REPEATS" \
+            "$WARMUPS" \
+            "$BOOT_ITERS" \
+            "$PERM_ITERS" \
+            "$BATCHES" \
+            "$CPU_CORE" \
+            "$TRIM" \
+            "$strict"
 
       - name: Upload benchmark artifacts
         uses: actions/upload-artifact@v4

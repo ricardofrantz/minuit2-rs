@@ -83,23 +83,32 @@ jobs:
 
       - name: Run benchmark + regenerate figures
         shell: bash
+        env:
+          REPEATS:    ${{ github.event.inputs.repeats           || '41'    }}
+          WARMUPS:    ${{ github.event.inputs.warmups           || '9'     }}
+          BOOT_ITERS: ${{ github.event.inputs.bootstrap_iters   || '5000'  }}
+          PERM_ITERS: ${{ github.event.inputs.permutation_iters || '10000' }}
+          BATCHES:    ${{ github.event.inputs.batches           || '9'     }}
+          TRIM:       ${{ github.event.inputs.trim_fraction     || '0.10'  }}
         run: |
-          REPEATS="${{ github.event.inputs.repeats || '41' }}"
-          WARMUPS="${{ github.event.inputs.warmups || '9' }}"
-          BOOT_ITERS="${{ github.event.inputs.bootstrap_iters || '5000' }}"
-          PERM_ITERS="${{ github.event.inputs.permutation_iters || '10000' }}"
-          BATCHES="${{ github.event.inputs.batches || '9' }}"
-          TRIM="${{ github.event.inputs.trim_fraction || '0.10' }}"
+          # Validate user-supplied inputs before they reach the benchmark script.
+          for var in REPEATS WARMUPS BOOT_ITERS PERM_ITERS BATCHES; do
+            v="${!var}"
+            [[ "$v" =~ ^[0-9]+$ ]] \
+              || { echo "::error::$var must be a non-negative integer (got: $v)"; exit 1; }
+          done
+          [[ "$TRIM" =~ ^[0-9]+(\.[0-9]+)?$ ]] \
+            || { echo "::error::TRIM must be a decimal (got: $TRIM)"; exit 1; }
 
           # Hosted runners are noisy/shared; keep strict checks off for scheduled refresh.
           bash examples/run_comparison.sh \
-            "${REPEATS}" \
-            "${WARMUPS}" \
-            "${BOOT_ITERS}" \
-            "${PERM_ITERS}" \
-            "${BATCHES}" \
+            "$REPEATS" \
+            "$WARMUPS" \
+            "$BOOT_ITERS" \
+            "$PERM_ITERS" \
+            "$BATCHES" \
             "" \
-            "${TRIM}" \
+            "$TRIM" \
             "0"
 
       - name: Upload benchmark artifacts
