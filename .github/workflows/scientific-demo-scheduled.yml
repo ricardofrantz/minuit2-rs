@@ -36,9 +36,6 @@ on:
         default: "0.10"
         type: string
 
-permissions:
-  contents: write
-
 concurrency:
   group: scientific-demo-scheduled-${{ github.ref }}
   cancel-in-progress: false
@@ -47,9 +44,11 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  benchmark-refresh:
-    name: Refresh scientific benchmark artifacts
+  benchmark:
+    name: Run benchmark + produce artifacts
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -120,9 +119,51 @@ jobs:
             examples/output/comparison_timings.csv
             examples/output/comparison_samples.csv
             examples/output/comparison_environment.json
+          retention-days: 30
+          if-no-files-found: error
 
-      - name: Commit refreshed artifacts (master only)
-        if: ${{ github.ref == 'refs/heads/master' }}
+  commit-refresh:
+    name: Commit refreshed artifacts (master only)
+    needs: benchmark
+    if: ${{ github.ref == 'refs/heads/master' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download benchmark artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: scientific-demo-scheduled-${{ github.run_id }}
+          path: /tmp/scientific-demo-artifacts
+
+      - name: Stage artifacts into worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p examples/output
+          # Copy by filename to be robust against upload/download path-preservation quirks.
+          for f in comparison.png comparison_timings.csv comparison_samples.csv comparison_environment.json; do
+            src="$(find /tmp/scientific-demo-artifacts -type f -name "$f" -print -quit)"
+            if [[ -z "$src" ]]; then
+              echo "::error::artifact $f not found in downloaded bundle" >&2
+              exit 1
+            fi
+            case "$f" in
+              comparison.png)
+                dst="examples/comparison.png" ;;
+              *)
+                dst="examples/output/$f" ;;
+            esac
+            cp "$src" "$dst"
+          done
+
+      - name: Commit refreshed artifacts
         shell: bash
         run: |
           if git diff --quiet -- \

@@ -57,9 +57,6 @@ on:
         default: false
         type: boolean
 
-permissions:
-  contents: write
-
 env:
   CARGO_TERM_COLOR: always
 
@@ -67,6 +64,8 @@ jobs:
   benchmark:
     name: Run scientific demos, tests, and benchmark
     runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -146,9 +145,50 @@ jobs:
             examples/output/comparison_timings.csv
             examples/output/comparison_samples.csv
             examples/output/comparison_environment.json
+          retention-days: 30
+          if-no-files-found: error
 
-      - name: Commit updated benchmark artifacts
-        if: ${{ inputs.auto_commit }}
+  commit-artifacts:
+    name: Commit updated benchmark artifacts
+    needs: benchmark
+    if: ${{ inputs.auto_commit }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download benchmark artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: scientific-demo-benchmark-${{ github.run_id }}
+          path: /tmp/scientific-demo-artifacts
+
+      - name: Stage artifacts into worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p examples/output
+          for f in comparison.png comparison_timings.csv comparison_samples.csv comparison_environment.json; do
+            src="$(find /tmp/scientific-demo-artifacts -type f -name "$f" -print -quit)"
+            if [[ -z "$src" ]]; then
+              echo "::error::artifact $f not found in downloaded bundle" >&2
+              exit 1
+            fi
+            case "$f" in
+              comparison.png)
+                dst="examples/comparison.png" ;;
+              *)
+                dst="examples/output/$f" ;;
+            esac
+            cp "$src" "$dst"
+          done
+
+      - name: Commit refreshed artifacts
         shell: bash
         run: |
           if git diff --quiet -- \
