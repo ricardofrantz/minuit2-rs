@@ -2,9 +2,13 @@
 name = "minuit2"
 version = "0.4.2"
 edition = "2024"
+rust-version = "1.85"
 description = "Pure Rust port of CERN Minuit2 parameter optimization engine"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ricardofrantz/minuit2-rs"
+documentation = "https://docs.rs/minuit2"
+homepage = "https://github.com/ricardofrantz/minuit2-rs"
+readme = "README.md"
 keywords = ["optimization", "minimization", "fitting", "physics"]
 categories = ["science", "mathematics"]
 
@@ -23,3 +27,24 @@ python = ["pyo3"]
 [[bench]]
 name = "benchmarks"
 harness = false
+
+[package.metadata.docs.rs]
+# Build docs.rs with every feature enabled so the Python and parallel
+# surfaces are both rendered.
+all-features = true
+
+[lints.rust]
+# No hand-written unsafe in this crate. `warn` (not `deny`) because macro
+# expansions in the optional pyo3 feature legitimately produce unsafe
+# blocks and we do not want to force every downstream proc-macro change
+# through this gate.
+unsafe_code = "warn"
+
+[lints.clippy]
+# Bug-catching lints at deny: these should never slip into a release.
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+use_debug = "deny"
+# A library should never terminate the host process.
+exit = "deny"
