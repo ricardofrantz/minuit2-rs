@@ -18,7 +18,7 @@ rayon = { version = "1.10", optional = true }
 pyo3 = { version = "0.28", optional = true, features = ["extension-module"] }
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.7"
 
 [features]
 parallel = ["rayon"]
