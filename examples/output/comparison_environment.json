@@ -1,8 +1,8 @@
 {
-  "timestamp_utc": "2026-04-17T06:16:35.010227+00:00",
-  "platform": "Linux-6.17.0-1010-azure-x86_64-with-glibc2.39",
+  "timestamp_utc": "2026-04-22T06:13:39.658200+00:00",
+  "platform": "Linux-6.17.0-1011-azure-x86_64-with-glibc2.39",
   "system": "Linux",
-  "release": "6.17.0-1010-azure",
+  "release": "6.17.0-1011-azure",
   "machine": "x86_64",
   "python": "3.12.13",
   "cpu_affinity": {
@@ -11,14 +11,14 @@
     "taskset_available": true
   },
   "linux": {
-    "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+    "cpu_model": "AMD EPYC 7763 64-Core Processor",
     "governors": [],
     "intel_pstate_no_turbo": null
   },
   "loadavg": {
-    "1min": 12.2509765625,
-    "5min": 3.3193359375,
-    "15min": 1.13916015625
+    "1min": 11.82275390625,
+    "5min": 3.28271484375,
+    "15min": 1.126953125
   },
   "benchmark_config": {
     "repeats_per_batch": 41,
