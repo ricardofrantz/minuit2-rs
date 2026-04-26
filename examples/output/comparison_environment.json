@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-04-25T06:00:29.388899+00:00",
+  "timestamp_utc": "2026-04-26T06:20:50.764162+00:00",
   "platform": "Linux-6.17.0-1010-azure-x86_64-with-glibc2.39",
   "system": "Linux",
   "release": "6.17.0-1010-azure",
@@ -11,14 +11,14 @@
     "taskset_available": true
   },
   "linux": {
-    "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+    "cpu_model": "AMD EPYC 7763 64-Core Processor",
     "governors": [],
     "intel_pstate_no_turbo": null
   },
   "loadavg": {
-    "1min": 10.71826171875,
-    "5min": 2.8603515625,
-    "15min": 0.99365234375
+    "1min": 10.60009765625,
+    "5min": 2.798828125,
+    "15min": 0.9453125
   },
   "benchmark_config": {
     "repeats_per_batch": 41,
