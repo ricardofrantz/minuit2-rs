@@ -1,8 +1,8 @@
 {
-  "timestamp_utc": "2026-04-28T06:47:04.496216+00:00",
-  "platform": "Linux-6.17.0-1011-azure-x86_64-with-glibc2.39",
+  "timestamp_utc": "2026-04-29T06:40:21.805992+00:00",
+  "platform": "Linux-6.17.0-1010-azure-x86_64-with-glibc2.39",
   "system": "Linux",
-  "release": "6.17.0-1011-azure",
+  "release": "6.17.0-1010-azure",
   "machine": "x86_64",
   "python": "3.12.13",
   "cpu_affinity": {
@@ -16,9 +16,9 @@
     "intel_pstate_no_turbo": null
   },
   "loadavg": {
-    "1min": 11.67041015625,
-    "5min": 3.03857421875,
-    "15min": 1.02294921875
+    "1min": 10.70458984375,
+    "5min": 2.81884765625,
+    "15min": 0.94921875
   },
   "benchmark_config": {
     "repeats_per_batch": 41,
