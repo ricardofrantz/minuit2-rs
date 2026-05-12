@@ -51,6 +51,6 @@ The comparison now uses in-process solver timing:
 
 GitHub Actions workflow:
 - `.github/workflows/scientific-demo.yml` runs tests, regenerates benchmark figures/artifacts, uploads them, and can optionally auto-commit updated benchmark outputs.
-- `.github/workflows/scientific-demo-scheduled.yml` runs on a daily schedule and only auto-commits refreshed benchmark artifacts when the workflow runs on `master`.
+- `.github/workflows/scientific-demo-scheduled.yml` can be run manually to refresh and auto-commit benchmark artifacts on `master`.
 
 ![C++ vs Rust timing comparison](comparison.png)
