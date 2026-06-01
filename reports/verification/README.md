@@ -6,6 +6,27 @@ Canonical reference target:
 - Tag: `v6-36-08`
 - Commit: `a8ca1b23e38d7dbe0ff24027894ca0f2ad65f1bd`
 
+This directory is a correctness-verification surface. It uses ROOT Minuit2 as a
+numerical reference/oracle for behavior comparisons. It does not claim that the
+Rust implementation is source-derived from ROOT, and it is not a legal
+provenance certificate.
+
+## Reference data regeneration
+
+The `raw/ref/*.json` files are produced by the ROOT C++ reference runner against
+the pinned tag/commit above. They are regenerated whenever the reference runner
+is rebuilt; rebuilding the runner on a different toolchain or CPU changes only
+last-digit floating-point rounding (compiler FMA contraction, `libm`), not the
+algorithm or the ROOT version.
+
+Such a rebuild typically shifts the stored values by well under `1e-8` absolute
+while `nfcn`, `valid`, and the convergence structure stay identical. The
+differential-gate tolerances absorb deltas of this size, so a pure-rounding
+refresh is not numerical drift, a regression, or a version change. To avoid
+committing rounding-only churn, regenerate these files only alongside a genuine
+reference update (a tag/commit bump or an intended behavior change). Regenerate
+with `scripts/run_full_verification.sh v6-36-08` (see Reproduce below).
+
 ## What is implemented
 
 - ROOT C++ reference runner: `tools/ref_runner_cpp/main.cpp`
@@ -54,18 +75,19 @@ python3 scripts/generate_verification_scorecard.py
 - `verification/traceability/executed_surface_gaps_baseline.csv`
 - `verification/traceability/waivers.csv`
 
-## Current snapshot
+## Last generated snapshot
 
-From latest run in this repo:
+From `reports/verification/manifest.json`, generated at
+`2026-02-11T13:57:34Z`:
 - pass: 10
 - warn: 2
 - fail: 0
 
-Current workload count: 12.
+Workload count: 12.
 
-Correctness gates currently pass for all workloads; warnings are NFCN-efficiency deltas only.
+Correctness gates passed for all workloads in that snapshot; warnings are NFCN-efficiency deltas only.
 
-This is a real, reproducible differential gate. It currently demonstrates correctness parity on the covered workloads, with remaining call-count efficiency differences.
+This is a real, reproducible differential gate. That snapshot demonstrates correctness parity on the covered workloads, with remaining call-count efficiency differences.
 
 Traceability status snapshot:
 - implemented: 303

@@ -1,11 +1,11 @@
-# ROOT Test Port Status (`v6-36-08`)
+# ROOT Test Replication Status (`v6-36-08`)
 
 Reference:
 - Repository: `https://github.com/root-project/root`
 - Subtree: `math/minuit2`
 - Tag: `v6-36-08`
 
-## P0 Regression Ports
+## P0 Regression Replications
 
 | ROOT test intent | Rust evidence | Status |
 |---|---|---|
@@ -25,6 +25,6 @@ cargo test --test root_reference_covariance
 
 - Summary: `reports/verification/diff_summary.md`
 - CSV: `reports/verification/diff_results.csv`
-- Current counts: pass=4, warn=2, fail=0
+- Snapshot counts: pass=10, warn=2, fail=0
 - Warning-only cases: NFCN divergence on `quadratic3_fixx_migrad` and `quadratic3_fixx_hesse`
 - Failing cases: none

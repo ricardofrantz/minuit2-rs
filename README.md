@@ -4,9 +4,9 @@
 [![crates.io](https://img.shields.io/crates/v/minuit2.svg)](https://crates.io/crates/minuit2)
 [![docs.rs](https://docs.rs/minuit2/badge.svg)](https://docs.rs/minuit2)
 
-Pure Rust port of [CERN Minuit2](https://github.com/root-project/root/tree/master/math/minuit2) — the standard parameter optimization engine for high-energy physics since 1975.
+Pure Rust implementation of Minuit-style parameter optimization algorithms, tested against [ROOT Minuit2](https://github.com/root-project/root/tree/master/math/minuit2) as a numerical reference.
 
-**Zero unsafe. Zero C++ dependencies. Drop-in for scientific workflows.**
+**No hand-written unsafe. No ROOT, GSL, C, or C++ dependency. Built for scientific workflows.**
 
 ## Table of Contents
 
@@ -39,19 +39,20 @@ Pure Rust port of [CERN Minuit2](https://github.com/root-project/root/tree/maste
 - [Benchmark Results](#benchmark-results)
 - [Status](#status)
 - [Verification (ROOT Parity)](#verification-root-parity)
+- [Provenance and Licensing](#provenance-and-licensing)
 - [License](#license)
 
 ---
 
 ## Features
 
-- **Pure Rust.** No C++ toolchain, no unsafe blocks, zero-cost abstractions. Compiles on all tier-1 Rust targets (Linux, macOS, Windows).
+- **Pure Rust.** No C++ toolchain and no hand-written unsafe blocks. Compiles on all tier-1 Rust targets (Linux, macOS, Windows).
 - **Robust Algorithms.** Migrad (Variable Metric / DFP), Simplex (Nelder-Mead with rho-extrapolation), Hesse (exact Hessian), Minos (asymmetric errors via likelihood contour walking), Scan (1D profiles), Contours (2D confidence regions).
 - **Analytical Gradients.** User-provided gradients via the `FCNGradient` trait for faster convergence and reduced function evaluations, especially in high-dimensional problems.
-- **Python Bindings.** High-performance [PyO3](https://pyo3.rs/) bindings with an iminuit-compatible API. Build with [maturin](https://www.maturin.rs/).
+- **Python Bindings.** High-performance [PyO3](https://pyo3.rs/) bindings with a measured `iminuit.Minuit`-compatible subset. Build with [maturin](https://www.maturin.rs/).
 - **Parallel Processing.** Optional [`rayon`](https://docs.rs/rayon) support for parallel 1D parameter scans.
-- **Numerical Stability.** NaN/Inf resilience with automatic recovery — FCN returns of NaN or Infinity are treated as large penalties, preventing optimizer crashes. Non-positive-definite covariance matrices are automatically corrected via eigenvalue shift.
-- **Verified against ROOT.** Differential testing against ROOT `v6-36-08` with 12 workloads, 415 traced symbols, and automated CI gates.
+- **Numerical Stability.** Resilience tests cover FCNs that can return NaN or Infinity near invalid regions. Non-positive-definite covariance matrices are automatically corrected via eigenvalue shift.
+- **Tested against ROOT.** Differential testing against ROOT `v6-36-08` as a numerical reference, with 12 workloads, 415 traced symbols, and automated CI gates.
 
 ---
 
@@ -527,29 +528,30 @@ Run the full example: `cargo run --example gaussian_fit`
 
 Enabled with the `python` feature flag. Built with [PyO3](https://pyo3.rs/) (v0.28) and [maturin](https://www.maturin.rs/).
 
+The binding targets a measured `iminuit.Minuit`-compatible subset. The current
+claim is bounded by `python/compat/diff_iminuit.py` plus the Python runtime
+tests; deferred APIs include the brute-force global `scan`, `mncontour(cl=...)`
+confidence-level scaling, `grad`/`g2`/`hessian` constructor callbacks, Matrix
+helper methods, plotting/interactive helpers, `scipy`, and `iminuit.cost`.
+
 ```python
 from minuit2 import Minuit
 
-# Define objective function — parameter names come from keyword arguments
+# Define objective function. Parameter names come from keyword arguments or
+# from signature introspection for positional starts.
 def fcn(x, y):
     return (x - 1)**2 + (y - 2)**2
 
-# Create Minuit object with initial values
+# Create Minuit object with initial values.
 m = Minuit(fcn, x=0, y=0)
 
-# Run Migrad
-m.migrad()
-print(m.values)  # {'x': ~1.0, 'y': ~2.0}
-print(m.errors)  # approximate errors
-print(m.valid)   # True
-print(m.fval)    # ~0.0
-
-# Refine errors with Hesse
-m.hesse()
-
-# Get asymmetric errors with Minos
-minos_errors = m.minos()
-# Returns: {'x': {'lower': -1.0, 'upper': 1.0}, 'y': {'lower': -1.0, 'upper': 1.0}}
+# Run Migrad, refine errors with Hesse, and get asymmetric errors with Minos.
+m.migrad().hesse().minos()
+print(m.values.to_dict())  # {'x': ~1.0, 'y': ~2.0}
+print(m.errors.to_dict())  # approximate errors
+print(m.valid)             # True
+print(m.fval)              # ~0.0
+print(m.merrors["x"].lower, m.merrors["x"].upper)
 
 # Access covariance matrix
 print(m.covariance)  # [[cov_xx, cov_xy], [cov_yx, cov_yy]]
@@ -557,17 +559,20 @@ print(m.covariance)  # [[cov_xx, cov_xy], [cov_yx, cov_yy]]
 # Global correlation coefficients
 print(m.global_cc)
 
-# Parameter scan
-points = m.scan("x", nsteps=100, low=-5.0, high=5.0)
+# 1D profile scans
+xs, fs = m.profile("x", size=100, bound=2.0, subtract_min=True)
+xs, fs, ok = m.mnprofile("x", size=30)
 
-# 2D contour
-contour_points = m.contour("x", "y", npoints=20)
+# 2D contours and contour grids
+contour_points = m.mncontour("x", "y", size=20)
+xg, yg, fval2d = m.contour("x", "y", size=50)
 
 # Set parameter limits
-m.limits = {"x": (-10, 10), "y": None}  # None removes limits
+m.limits["x"] = (-10, 10)
+m.limits["y"] = None  # remove limits
 
 # Fix parameters
-m.fixed = ["y"]  # fix y at its current value
+m.fixed["y"] = True
 
 # Run Simplex instead
 m.simplex()
@@ -773,7 +778,7 @@ For each parameter, Minos finds the points where f(x) = f_min + UP by:
 
 `minuit2-rs` implements several safety layers to ensure reliability in scientific workflows:
 
-1. **NaN/Inf Resilience:** If your FCN returns `NaN` or `Inf`, the optimizer treats it as a huge penalty value. This prevents the linear algebra core from collapsing and allows the minimizer to "back out" of illegal parameter regions.
+1. **NaN/Inf Resilience:** Robustness tests cover objectives that return `NaN` or `Inf` near invalid parameter regions, and internal floating-point ordering uses NaN-safe comparisons where ordering is required.
 
 2. **Positive-Definite Correction (MnPosDef):** If the covariance matrix becomes non-positive-definite (due to negative curvature, numerical precision loss, or a saddle point), the library automatically applies an eigenvalue shift to restore positive-definiteness. This tracks whether a diagonal shift was needed before the eigenvalue check.
 
@@ -788,7 +793,7 @@ For each parameter, Minos finds the points where f(x) = f_min + UP by:
 
 ## Architecture: Differences from C++ Minuit2
 
-This is a clean Rust rewrite, not a line-by-line translation. Key architectural differences:
+The implementation is organized as Rust-native code with architectural differences from C++ Minuit2:
 
 | C++ Minuit2 | Rust minuit2-rs | Rationale |
 |-------------|-----------------|-----------|
@@ -821,7 +826,9 @@ If you're coming from [iminuit](https://scikit-hep.org/iminuit/), here's the map
 | `m.fixed["x"] = True` | `.add_const("x", value)` | Fixed at construction time |
 | `m.limits["x"] = (-1, 1)` | `.add_limited("x", val, err, -1.0, 1.0)` | Limits at construction time |
 
-The Python bindings (`feature = "python"`) provide an API closer to iminuit — see the [Python Bindings](#python-bindings) section.
+The Python bindings (`feature = "python"`) provide a measured `iminuit.Minuit`
+subset closer to this Python surface; see the [Python Bindings](#python-bindings)
+section and `reports/parity/dropin_compat.md` for the current claim boundary.
 
 ---
 
@@ -853,7 +860,7 @@ Run benchmarks: `cargo bench`
 | **MnScan** | Done | 1D parameter scans (serial + parallel with `rayon`) |
 | **MnContours** | Done | 2D confidence contours at f_min + UP |
 | **Analytical Gradients** | Done | `FCNGradient` trait for user-provided derivatives |
-| **Python Bindings** | Done | PyO3 v0.28 with iminuit-style API |
+| **Python Bindings** | Done | PyO3 v0.28 with a measured `iminuit.Minuit`-compatible subset |
 | **Global Correlations** | Done | Global correlation coefficients from covariance |
 | **Covariance Squeeze** | Done | Remove parameter from covariance matrix |
 
@@ -863,7 +870,8 @@ Run benchmarks: `cargo bench`
 
 This crate is verified against ROOT `v6-36-08` (`math/minuit2` subsystem only). Verification is automated and runs in CI.
 
-**Current snapshot (2026-02-12):**
+**Last generated verification snapshot in this checkout
+(`reports/verification/manifest.json`, generated 2026-02-11T13:57:34Z):**
 
 | Metric | Value |
 |--------|-------|
@@ -932,12 +940,36 @@ Until the executed-surface strict gate is green (`P0=0`, `P1=0`) and differentia
 
 ---
 
-## Upstream Source
+## Provenance and Licensing
 
-Ported from [ROOT Minuit2 (`math/minuit2`)](https://github.com/root-project/root/tree/master/math/minuit2). This port replaces custom C++ linear algebra with [`nalgebra`](https://nalgebra.org/) and manual memory management with Rust's ownership model.
+This crate is an independent, pure-Rust **reimplementation** of the Minuit2
+algorithms, licensed under **`LGPL-2.1-or-later`** to match the upstream ROOT
+Minuit2 it reimplements. The original ROOT Minuit2 is © CERN/PH-SFT
+(M. Winkler, F. James, L. Moneta, A. Zsenei) under LGPL-2.1; it is used here as a
+numerical/behavioral reference for parity testing, not as a linked dependency and
+not as code included in this crate. This project is **not affiliated with or
+endorsed by CERN or the ROOT project** (see [NOTICE](NOTICE)). GSL is not linked,
+wrapped, or depended on. The implementation uses
+[`nalgebra`](https://nalgebra.org/) for linear algebra and does not depend on
+ROOT, GSL, C, or C++.
+
+The verification reports in this repository are correctness evidence: they
+compare numerical behavior against a reference baseline. They are not a legal
+provenance certificate. Downstream users with strict license-provenance
+requirements should review the implementation and audit trail for their own
+use case.
 
 See also: [DOC.md](DOC.md) for additional API documentation.
 
 ## License
 
-MIT OR Apache-2.0
+Licensed under the **GNU Lesser General Public License, version 2.1 or later**
+([`LGPL-2.1-or-later`](LICENSE)), matching the upstream ROOT Minuit2 that this
+crate reimplements.
+
+The original Minuit2 is © CERN/PH-SFT under LGPL-2.1. This crate is an
+independent Rust reimplementation, also released under LGPL-2.1 — see
+[NOTICE](NOTICE). Not affiliated with or endorsed by CERN or the ROOT project.
+
+This statement is not legal advice; downstream users with strict provenance
+requirements should perform their own review.

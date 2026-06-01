@@ -24,18 +24,18 @@ Top-level tests discovered in `math/minuit2/test`:
 
 | ROOT test | Core Minuit2 only? | Rust replication strategy | Priority |
 |---|---|---|---|
-| `testMinuit2.cxx` | Yes | Port as regression tests in `tests/root_reference_minuit2.rs`; include Hessian external-indexing and no-`G2` call behavior checks | P0 |
-| `testCovariance.cxx` | Mostly yes | Port covariance transform round-trip/consistency checks into `tests/root_reference_covariance.rs` | P0 |
+| `testMinuit2.cxx` | Yes | Replicate as regression tests in `tests/root_reference_minuit2.rs`; include Hessian external-indexing and no-`G2` call behavior checks | P0 |
+| `testCovariance.cxx` | Mostly yes | Replicate covariance transform round-trip/consistency checks into `tests/root_reference_covariance.rs` | P0 |
 | `testMinimizer.cxx` | Mostly yes | Extract deterministic objective families (Rosenbrock, ChebyQuad, TrigoFletcher) into fixture-based differential tests | P0 |
-| `MnTutorial/Quad*` | Yes | Port as dimensional scaling correctness/robustness tests | P1 |
-| `MnSim/ParallelTest.cxx` | Mostly yes | Port as controlled performance/consistency test with deterministic data | P1 |
-| `MnSim/PaulTest*.cxx`, `ReneTest.cxx` | Mixed | Port algorithmic core portions; replace ROOT I/O with checked-in fixture data | P2 |
-| `testADMinim.cxx` | Mixed | Port only if Rust-side AD path is in scope; otherwise track as out-of-scope with rationale | P2 |
+| `MnTutorial/Quad*` | Yes | Replicate as dimensional scaling correctness/robustness tests | P1 |
+| `MnSim/ParallelTest.cxx` | Mostly yes | Replicate as controlled performance/consistency test with deterministic data | P1 |
+| `MnSim/PaulTest*.cxx`, `ReneTest.cxx` | Mixed | Replicate algorithmic core portions; replace ROOT I/O with checked-in fixture data | P2 |
+| `testADMinim.cxx` | Mixed | Replicate only if Rust-side AD path is in scope; otherwise track as out-of-scope with rationale | P2 |
 | `testNdimFit.cxx` | No (ROOT Fit layer) | Recreate equivalent statistical objective directly in Rust without ROOT `Fit::Fitter` | P2 |
 | `testUnbinGausFit.cxx` | No (ROOT Fit layer) | Recreate likelihood workload directly using Rust FCN interface | P2 |
 | `testUserFunc.cxx` | No (hist/TF1/UI) | Treat as integration/UI test not applicable to pure Minuit2 core | P3 |
 
-## Current Port Status (Implemented)
+## Current Replication Status (Implemented)
 
 | ROOT source | Rust test | Status | Notes |
 |---|---|---|---|
@@ -59,7 +59,7 @@ Top-level tests discovered in `math/minuit2/test`:
 
 - `tests/root_reference_minuit2.rs`
 - `tests/root_reference_covariance.rs`
-- `verification/workloads/root_ported/*.json`
+- `verification/workloads/root_reference_*.json`
 - `reports/verification/root_test_port_status.md` (coverage of ROOT tests replicated)
 
 ## Acceptance for "ROOT tests replicated"

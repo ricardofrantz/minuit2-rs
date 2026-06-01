@@ -5,7 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.5.0] - 2026-06-01
+
+### Added
+
+- Python packaging: `pyproject.toml` (maturin backend, mixed layout under
+  `python/`), `cdylib` crate-type, and an abi3 wheel. The bindings are now
+  installable/importable (`from minuit2 import Minuit`).
+- measured iminuit-compatible Python API subset (phase 1): method chaining
+  (`migrad`/`hesse`/`simplex`/`minos` return `self`); `minos` populates
+  `merrors`; new `errordef`/`strategy`/`tol` (read/write) and
+  `fmin`/`params`/`merrors`/`nfcn`/`npar`/`nfit`/`parameters`/`accurate`
+  properties; new `FMin`/`Param`/`MError` classes.
+- measured iminuit-compatible scan subset (phase 2): `mnprofile` (re-minimized 1D profile),
+  `contour` (fixed-others value grid). Scan/profile/contour methods return
+  numpy arrays.
+
+### Fixed
+
+- Migrad: a free parameter started *exactly* on a limit no longer gets stuck on
+  the bound. The bound transform's zero Jacobian at the boundary produced a zero
+  seed gradient (EDM=0) and a premature "converged" result; the seed now performs
+  a negative-curvature escape (`escape_negative_curvature` in `src/migrad/seed.rs`)
+  when `g2 <= 0`, matching ROOT/iminuit. Off-boundary fits are unchanged.
+  Regression test: `tests/limit_boundary.rs`.
+
+### Changed (breaking, Python API)
+
+- Renamed `Minuit.contour(par_x, par_y, npoints)` -> `Minuit.mncontour(x, y, *,
+  cl=None, size=100)` (Minos contour boundary points, returned as a closed
+  `(size+1, 2)` numpy array). `cl` scaling is not yet implemented.
+- Renamed `Minuit.scan(param, nsteps, low, high)` -> `Minuit.profile(vname, *,
+  size=100, bound=2.0, subtract_min=False)` (1D profile with other params held
+  fixed, returns `(x, fvals)` numpy arrays).
+- `Minuit.scan(...)` now refers to iminuit's brute-force global minimizer and
+  currently raises `NotImplementedError` (deferred), rather than silently doing
+  a 1D profile under the old name.
+
+### Changed
+
+- Slimmed the published crate from 8.4 MiB (237 files) to ~97 KiB by switching
+  `Cargo.toml` from an `exclude` blocklist to an anchored `include` allowlist.
+  The crate now ships only the library/example/bench source, `README`,
+  `CHANGELOG`, and the two license files; example datasets, verification
+  reports, coverage dumps, figures, and dev tooling are no longer published.
+- Fixed all generated-CSV writers (`generate_parity_report.py`,
+  `compare_ref_vs_rust.py`, `generate_similarity_audit.py`) to emit `LF` line
+  terminators instead of the `csv` module's default `CRLF`, which had tripped
+  `git diff --check`.
+- Licensed the crate as `LGPL-2.1-or-later`, matching the upstream ROOT Minuit2
+  that it reimplements. (Earlier 0.5.0 development drafts had used
+  `MIT OR Apache-2.0`; since this is a reimplementation of LGPL code rather than
+  a clean-room work, the honest and safe license is the upstream one. No
+  permissively-licensed version was ever published.) Added the `LGPL-2.1` text
+  as `LICENSE` and a `NOTICE` crediting the original CERN/PH-SFT authors.
+- Clarified public provenance wording: this crate is an independent Rust
+  reimplementation validated against ROOT Minuit2 as a numerical reference; ROOT
+  Minuit2 is not a source dependency. Removed loose "clean-room" phrasing.
+- Updated the release workflow gate to require release tags to be reachable
+  from `origin/main` and to run `cargo package --locked` before
+  `cargo publish --locked`.
+- Retargeted the scheduled scientific-demo artifact commit gate from
+  `master` to `main`.
 
 ## [0.4.2] - 2026-04-21
 
@@ -153,7 +214,8 @@ changes; the Rust library surface is identical to 0.4.1.
 - `MnStrategy` (low/medium/high optimization presets)
 - `nalgebra` for all linear algebra
 
-[Unreleased]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.3.0...v0.4.0
