@@ -9,8 +9,8 @@ fn rosenbrock_2d() {
     let result = MnSimplex::new()
         .add("x", 0.0, 0.1)
         .add("y", 0.0, 0.1)
-        // With ROOT-compatible Simplex EDM criterion, use a tighter tolerance
-        // for Rosenbrock to ensure full convergence.
+        // With the Simplex EDM criterion, use a tighter tolerance for
+        // Rosenbrock to ensure full convergence.
         .tolerance(1.0e-5)
         .minimize(&|p: &[f64]| (1.0 - p[0]).powi(2) + 100.0 * (p[1] - p[0] * p[0]).powi(2));
 
@@ -177,4 +177,16 @@ fn display_output() {
         .minimize(&|p: &[f64]| p[0] * p[0]);
 
     common::assert_function_minimum_display(&result, &["x"]);
+}
+
+#[test]
+fn respects_call_limit() {
+    let result = MnSimplex::new()
+        .add("x", 5.0, 1.0)
+        .add("y", -3.0, 1.0)
+        .max_fcn(4)
+        .minimize(&|p: &[f64]| p[0] * p[0] + p[1] * p[1]);
+
+    assert!(result.reached_call_limit());
+    assert!(result.nfcn() >= 4);
 }

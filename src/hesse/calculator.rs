@@ -1,7 +1,6 @@
 //! Core Hesse algorithm: computes the full Hessian matrix by finite differences.
 //!
-//! Replaces HesseCrossDerivative.cxx and the diagonal Hessian calculation from
-//! MnHesse.cxx. Steps:
+//! Steps:
 //! 1. Diagonal elements via 5-point refinement
 //! 2. Gradient refinement using Hessian info (if strategy > 0)
 //! 3. Off-diagonal elements via cross-derivatives

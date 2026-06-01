@@ -1,9 +1,9 @@
 //! MnHesse: accurate error analysis via full Hessian computation.
 //!
-//! Replaces MnHesse.h/.cxx. After Migrad converges, MnHesse computes the
-//! full second-derivative matrix (Hessian) to get accurate parameter errors
-//! and correlations. This is especially important when Migrad's DFP-updated
-//! inverse Hessian is only approximate.
+//! After Migrad converges, MnHesse computes the full second-derivative matrix
+//! (Hessian) to get accurate parameter errors and correlations. This is
+//! especially important when Migrad's DFP-updated inverse Hessian is only
+//! approximate.
 
 pub mod calculator;
 pub mod gradient;

@@ -18,7 +18,7 @@ pub trait FCN {
         1.0
     }
 
-    /// ROOT-compatible alias for `error_def()`.
+    /// Alias for `error_def()`.
     fn up(&self) -> f64 {
         self.error_def()
     }

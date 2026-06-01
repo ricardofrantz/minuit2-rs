@@ -24,7 +24,6 @@ pub struct MnSimplex {
 }
 
 impl MnSimplex {
-    /// Create a new Simplex minimizer with default strategy.
     /// Create a new Simplex minimizer with default settings.
     pub fn new() -> Self {
         Self {
@@ -35,7 +34,6 @@ impl MnSimplex {
         }
     }
 
-    /// Set strategy level (0=low, 1=medium, 2=high).
     /// Set the optimization strategy level.
     pub fn with_strategy(mut self, level: u32) -> Self {
         self.strategy = MnStrategy::new(level);

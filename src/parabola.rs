@@ -1,8 +1,7 @@
 //! Quadratic parabola utilities for line search.
 //!
-//! Replaces MnParabolaPoint.h and MnParabola.h/.cxx. A simple quadratic
-//! f(x) = a*x² + b*x + c used during parabolic line search to interpolate
-//! function values along a search direction.
+//! A simple quadratic `f(x) = a*x^2 + b*x + c` used during parabolic line
+//! search to interpolate function values along a search direction.
 
 /// A point (x, y) on the parabola.
 #[derive(Debug, Clone, Copy)]

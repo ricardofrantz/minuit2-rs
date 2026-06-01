@@ -1,6 +1,6 @@
 /// A single minimization parameter with name, value, error, and optional bounds.
 ///
-/// Mirrors MinuitParameter.h. Parameters can be free, fixed, or constant.
+/// Parameters can be free, fixed, or constant.
 /// "Constant" means permanently fixed (never released during minimization).
 #[derive(Debug, Clone)]
 pub struct MinuitParameter {

@@ -1,6 +1,6 @@
 //! Remove a parameter from a covariance/Hessian matrix.
 //!
-//! Replaces MnCovarianceSqueeze.h/.cxx. Three operations:
+//! Three covariance squeeze operations:
 //! 1. Squeeze a DMatrix (remove row/col n)
 //! 2. Squeeze an MnUserCovariance (invert → squeeze Hessian → invert back)
 //! 3. Squeeze a MinimumError (extract Hessian → squeeze → invert → new MinimumError)

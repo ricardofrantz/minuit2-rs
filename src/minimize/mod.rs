@@ -118,7 +118,7 @@ impl MnMinimize {
 
     /// Run the combined minimization.
     ///
-    /// ROOT Minuit2 parity:
+    /// Combined minimizer sequence:
     /// 1) Try Migrad first.
     /// 2) If Migrad fails, run Simplex with strategy 2.
     /// 3) If Simplex succeeds, run Migrad again from that point (strategy 2).
@@ -140,7 +140,7 @@ impl MnMinimize {
             return min;
         }
 
-        // Fallback path (ROOT CombinedMinimumBuilder): use strategy 2.
+        // Fallback path: use the more robust strategy level.
         let fallback_strategy = 2_u32;
         let simplex = Self::configure_simplex_from_params(
             MnSimplex::new().with_strategy(fallback_strategy),

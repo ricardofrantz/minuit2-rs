@@ -1,8 +1,7 @@
 //! Function gradient in internal parameter space.
 //!
-//! Replaces BasicFunctionGradient.h. Stores the gradient vector plus
-//! auxiliary vectors `g2` (second derivative estimates) and `gstep`
-//! (step sizes used for numerical differentiation).
+//! Stores the gradient vector plus auxiliary vectors `g2` (second derivative
+//! estimates) and `gstep` (step sizes used for numerical differentiation).
 
 use nalgebra::DVector;
 

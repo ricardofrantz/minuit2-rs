@@ -1,8 +1,8 @@
 //! MnFunctionCross: iterative crossing-point finder.
 //!
-//! Replaces MnFunctionCross.cxx. Finds the point where the function value
-//! equals fmin + Up, by iteratively running Migrad with the scanned parameter
-//! fixed and using parabolic interpolation to converge on the crossing.
+//! Finds the point where the function value equals `fmin + Up`, by iteratively
+//! running Migrad with the scanned parameter fixed and using parabolic
+//! interpolation to converge on the crossing.
 
 use crate::fcn::FCN;
 use crate::migrad::MnMigrad;

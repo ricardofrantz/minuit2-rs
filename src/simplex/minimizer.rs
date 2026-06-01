@@ -1,7 +1,6 @@
 //! SimplexMinimizer: composes seed generator + builder.
 //!
-//! Replaces SimplexMinimizer.h. This is the internal minimizer component
-//! that the public `MnSimplex` API delegates to.
+//! Internal minimizer component used by the public `MnSimplex` API.
 
 use super::builder::SimplexBuilder;
 use super::seed::SimplexSeedGenerator;
@@ -29,7 +28,7 @@ impl SimplexMinimizer {
             return FunctionMinimum::new(seed, Vec::new(), up);
         }
 
-        // ROOT Minuit2 semantics: builder EDM target is tolerance scaled by Up.
+        // The builder EDM target is tolerance scaled by Up.
         // (`0.001` scaling is specific to Migrad's internal criterion, not Simplex.)
         let minedm = tolerance * up;
 

@@ -1,7 +1,7 @@
 use minuit2::{FCN, FCNGradient, MnHesse, MnMigrad, MnMinimize, MnSimplex};
 use std::cell::Cell;
 
-/// Port of ROOT Minuit2 regression intent from `math/minuit2/test/testMinuit2.cxx`:
+/// Regression behavior checked against ROOT Minuit2 `math/minuit2/test/testMinuit2.cxx`:
 /// Hessian indexing must follow floating parameters when fixed parameters exist.
 #[test]
 fn root_hessian_external_indexing_numeric() {
@@ -219,7 +219,7 @@ fn root_minimize_reference_rosenbrock2() {
     );
 }
 
-/// Port of ROOT test intent `NoG2CallsWhenFCHasNoG2`:
+/// Reference behavior for `NoG2CallsWhenFCHasNoG2`:
 /// if FCN reports no G2 support, G2 must not be called.
 #[test]
 fn root_no_g2_calls_when_fcn_has_no_g2() {

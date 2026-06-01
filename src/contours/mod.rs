@@ -1,7 +1,7 @@
 //! MnContours: 2D confidence contours.
 //!
-//! Replaces MnContours.h/.cxx. Computes a set of points tracing a contour
-//! where F(x,y) = Fmin + Up in the (par_x, par_y) plane.
+//! Computes points tracing a contour where `F(x, y) = Fmin + Up` in the
+//! `(par_x, par_y)` plane.
 
 pub mod contours_error;
 

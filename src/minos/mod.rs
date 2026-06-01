@@ -1,8 +1,7 @@
 //! MnMinos: asymmetric profile-likelihood errors.
 //!
-//! Replaces MnMinos.h/.cxx. After Migrad (and optionally Hesse), MnMinos
-//! computes the asymmetric errors by finding where F(x) = Fmin + Up for
-//! each parameter.
+//! After Migrad, and optionally Hesse, MnMinos computes asymmetric errors by
+//! finding where `F(x) = Fmin + Up` for each parameter.
 
 pub mod cross;
 pub mod function_cross;
@@ -61,7 +60,7 @@ impl<'a> MnMinos<'a> {
         (me.lower_error(), me.upper_error())
     }
 
-    /// ROOT-compatible alias for `errors`.
+    /// Alias for `errors`.
     pub fn minos(&self, par: usize) -> MinosError {
         self.minos_error(par)
     }
@@ -86,17 +85,17 @@ impl<'a> MnMinos<'a> {
         self.find_crossing(par, 1.0)
     }
 
-    /// ROOT-compatible alias for `lower` crossing object.
+    /// Alias for the lower crossing object.
     pub fn loval(&self, par: usize) -> MnCross {
         self.lower(par)
     }
 
-    /// ROOT-compatible alias for `upper` crossing object.
+    /// Alias for the upper crossing object.
     pub fn upval(&self, par: usize) -> MnCross {
         self.upper(par)
     }
 
-    /// ROOT-compatible helper with explicit direction.
+    /// Helper with explicit crossing direction.
     pub fn find_cross_value(&self, dir: i32, par: usize, maxcalls: usize, toler: f64) -> MnCross {
         let direction = if dir < 0 { -1.0 } else { 1.0 };
         let nvar = self.minimum.n_variable_params();

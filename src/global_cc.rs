@@ -1,7 +1,7 @@
 //! Global correlation coefficients from a covariance matrix.
 //!
-//! Replaces MnGlobalCorrelationCoeff.h/.cxx. Computes gcc(i) = sqrt(1 - 1/(V_inv(i,i) * V(i,i)))
-//! which measures how correlated each parameter is with all others combined.
+//! Computes `gcc(i) = sqrt(1 - 1/(V_inv(i,i) * V(i,i)))`, which measures how
+//! correlated each parameter is with all others combined.
 
 use nalgebra::DMatrix;
 

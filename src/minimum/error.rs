@@ -1,8 +1,7 @@
 //! Error matrix (inverse Hessian) at the minimum.
 //!
-//! Replaces BasicMinimumError.h/.cxx. The error matrix is the covariance
-//! matrix in internal parameter space. Various status flags track how it
-//! was obtained and whether it's reliable.
+//! The error matrix is the covariance matrix in internal parameter space.
+//! Status flags track how it was obtained and whether it is reliable.
 
 use nalgebra::DMatrix;
 
@@ -155,12 +154,12 @@ impl MinimumError {
         self.matrix.clone().try_inverse()
     }
 
-    /// ROOT compatibility helper: invert a matrix and return `None` on failure.
+    /// Invert a matrix and return `None` on failure.
     pub fn invert_matrix(matrix: &DMatrix<f64>) -> Option<DMatrix<f64>> {
         matrix.clone().try_inverse()
     }
 
-    /// Debug rendering helper matching C++ `print` utility role.
+    /// Debug rendering helper.
     pub fn print(&self) -> String {
         format!(
             "MinimumError(valid={}, accurate={}, made_pos_def={}, invert_failed={}, dcovar={:.6e})",

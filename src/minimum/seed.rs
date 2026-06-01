@@ -1,7 +1,6 @@
 //! Initial state for a minimizer: starting point + gradient + error matrix.
 //!
-//! Replaces BasicMinimumSeed.h. The seed is constructed by a `SeedGenerator`
-//! (e.g., `SimplexSeedGenerator`) and passed to a `MinimumBuilder`.
+//! The seed is constructed by a seed generator and passed to a minimum builder.
 
 use super::state::MinimumState;
 use crate::user_transformation::MnUserTransformation;

@@ -1,7 +1,7 @@
 //! MinosError: paired upper/lower crossing results for one parameter.
 //!
-//! Replaces MinosError.h. Wraps two MnCross results (upper and lower) and
-//! computes the actual parameter error in external space.
+//! Wraps two crossing results (upper and lower) and computes the actual
+//! parameter error in external space.
 
 use super::cross::MnCross;
 

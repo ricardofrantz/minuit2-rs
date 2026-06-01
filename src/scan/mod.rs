@@ -1,7 +1,7 @@
 //! MnScan / MnParameterScan: 1D parameter scan.
 //!
-//! Replaces MnParameterScan.h/.cxx and MnScan.h. Evaluates the function
-//! along one parameter direction, keeping others at their minimum values.
+//! Evaluates the function along one parameter direction, keeping others at
+//! their minimum values.
 
 use crate::fcn::FCN;
 use crate::minimum::FunctionMinimum;
@@ -82,11 +82,18 @@ impl<'a, F: FCN + ?Sized> MnParameterScan<'a, F> {
         values: &[f64],
     ) -> Vec<(f64, f64)> {
         let step = (high - low) / nsteps as f64;
+        let mut pars = values.to_vec();
         (0..=nsteps)
-            .map(|i| self.scan_point(par, low + i as f64 * step, values))
+            .map(|i| {
+                let x = low + i as f64 * step;
+                pars[par] = x;
+                let f = self.fcn.value(&pars);
+                (x, f)
+            })
             .collect()
     }
 
+    #[cfg(feature = "parallel")]
     fn scan_point(&self, par: usize, x: f64, values: &[f64]) -> (f64, f64) {
         let mut pars = values.to_vec();
         pars[par] = x;

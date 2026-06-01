@@ -3,8 +3,8 @@ use crate::precision::MnMachinePrecision;
 
 /// Square-root transform for lower-bounded parameters.
 ///
-/// Maps \[lower, +∞) ↔ (-∞, +∞).
-/// Exact formulas from SqrtLowParameterTransformation.cxx.
+/// Maps `x in [lower, +inf)` to an unconstrained internal coordinate with
+/// `x = lower - 1 + sqrt(y^2 + 1)`.
 pub struct SqrtLowTransform;
 
 impl SqrtLowTransform {

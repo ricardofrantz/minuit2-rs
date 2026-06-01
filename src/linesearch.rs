@@ -1,8 +1,7 @@
 //! Parabolic line search along a step direction.
 //!
-//! Replaces MnLineSearch.cxx. Performs a 1D parabolic interpolation to find
-//! the optimal step size λ along a given search direction. Returns the
-//! optimal (λ, f(λ)) pair.
+//! Performs one-dimensional parabolic interpolation to choose a step length
+//! along a search direction. Returns the best `(lambda, f(lambda))` pair found.
 
 use crate::minimum::parameters::MinimumParameters;
 use crate::mn_fcn::MnFcn;
@@ -21,156 +20,128 @@ pub fn mn_linesearch(
     gdel: f64,
     prec: &MnMachinePrecision,
 ) -> MnParabolaPoint {
-    let _overal = 1000.0;
-    let undral = -100.0;
-    let toler = 0.05;
-    let slambg = 5.0;
-    let alpha = 2.0;
-    let maxiter = 12;
+    const LOWER_STEP_LIMIT: f64 = -100.0;
+    const NEAR_EXISTING_POINT_TOLERANCE: f64 = 0.05;
+    const INITIAL_STEP_LIMIT: f64 = 5.0;
+    const BEST_STEP_EXPANSION: f64 = 2.0;
+    const MAX_PARABOLA_REFINEMENTS: usize = 12;
 
-    let f0 = params.fval();
-    let x0 = params.vec();
+    let start_value = params.fval();
+    let start = params.vec();
 
-    // Evaluate at unit step
-    let p1 = x0 + step;
-    let f1 = fcn.call(p1.as_slice());
+    let unit_value = evaluate_step(fcn, start, step, 1.0);
 
-    let mut fvmin = f0;
-    let mut xvmin = 0.0;
-    if f1 < f0 {
-        fvmin = f1;
-        xvmin = 1.0;
+    let mut best_lambda = 0.0;
+    let mut best_value = start_value;
+    if unit_value < start_value {
+        best_lambda = 1.0;
+        best_value = unit_value;
     }
 
-    let toler8 = toler;
-    let slamax = slambg;
-    let flast = f1;
-
-    // Two-point parabolic interpolation using gradient at λ=0
-    let mut slam = 1.0;
-    let denom = 2.0 * (flast - f0 - gdel * slam) / (slam * slam);
-    if denom.abs() > prec.eps2() {
-        slam = -gdel / denom;
+    let mut trial_lambda = 1.0;
+    let curvature =
+        2.0 * (unit_value - start_value - gdel * trial_lambda) / (trial_lambda * trial_lambda);
+    if curvature.abs() > prec.eps2() {
+        trial_lambda = -gdel / curvature;
     } else {
-        // Can't form parabola — try a large step
-        slam = slamax;
+        trial_lambda = INITIAL_STEP_LIMIT;
     }
 
-    // Clamp slam
-    if slam > slamax {
-        slam = slamax;
-    }
-    if slam < toler8 {
-        slam = toler8;
-    }
-    if slam < 0.0 {
-        slam = slamax;
+    trial_lambda = trial_lambda.clamp(NEAR_EXISTING_POINT_TOLERANCE, INITIAL_STEP_LIMIT);
+
+    if (trial_lambda - 1.0).abs() < NEAR_EXISTING_POINT_TOLERANCE && unit_value < start_value {
+        return MnParabolaPoint::new(best_lambda, best_value);
     }
 
-    // Check if first step was already good enough
-    if (slam - 1.0).abs() < toler8 && f1 < f0 {
-        return MnParabolaPoint::new(xvmin, fvmin);
+    let trial_value = evaluate_step(fcn, start, step, trial_lambda);
+
+    if trial_value < best_value {
+        best_lambda = trial_lambda;
+        best_value = trial_value;
     }
 
-    // Evaluate at the interpolated step
-    let p2 = x0 + slam * step;
-    let f2 = fcn.call(p2.as_slice());
+    let mut points = sorted_points([
+        MnParabolaPoint::new(0.0, start_value),
+        MnParabolaPoint::new(1.0, unit_value),
+        MnParabolaPoint::new(trial_lambda, trial_value),
+    ]);
 
-    if f2 < fvmin {
-        fvmin = f2;
-        xvmin = slam;
-    }
+    let upper_step_limit = (BEST_STEP_EXPANSION * best_lambda.abs()).max(INITIAL_STEP_LIMIT);
 
-    // Now we have 3 points: (0, f0), (1, f1), (slam, f2)
-    // Set up for 3-point iteration
-    let mut pt0 = MnParabolaPoint::new(0.0, f0);
-    let mut pt1 = MnParabolaPoint::new(1.0, f1);
-    let mut pt2 = MnParabolaPoint::new(slam, f2);
+    for _ in 0..MAX_PARABOLA_REFINEMENTS {
+        let parabola = from_3_points(points[0], points[1], points[2]);
 
-    // Sort so that pt0.x < pt1.x < pt2.x
-    let mut pts = [pt0, pt1, pt2];
-    pts.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
-    pt0 = pts[0];
-    pt1 = pts[1];
-    pt2 = pts[2];
-
-    let slamax = (alpha * xvmin.abs()).max(slamax);
-
-    for _niter in 0..maxiter {
-        // Fit parabola through 3 points
-        let pb = from_3_points(pt0, pt1, pt2);
-
-        // Only use parabola minimum if curvature is positive (upward parabola)
-        if pb.a() < prec.eps2() {
-            // Flat or downward — can't trust the minimum, break
+        if parabola.a() < prec.eps2() {
             break;
         }
 
-        slam = pb.min();
+        trial_lambda = parabola.min();
 
-        // Clamp slam to reasonable range
-        if slam > slamax {
-            slam = slamax;
+        if trial_lambda > upper_step_limit {
+            trial_lambda = upper_step_limit;
         }
-        if slam < undral {
-            slam = undral;
+        if trial_lambda < LOWER_STEP_LIMIT {
+            trial_lambda = LOWER_STEP_LIMIT;
         }
-        if slam < 0.0 && pb.y(0.0) < pb.y(slam) {
-            // Going backward makes things worse — stop
+        if trial_lambda < 0.0 && parabola.y(0.0) < parabola.y(trial_lambda) {
             break;
         }
 
-        // Don't evaluate too close to existing points
-        let toler9 = toler * slam.abs().max(1.0);
-        if (slam - pt0.x).abs() < toler9
-            || (slam - pt1.x).abs() < toler9
-            || (slam - pt2.x).abs() < toler9
+        let min_spacing = NEAR_EXISTING_POINT_TOLERANCE * trial_lambda.abs().max(1.0);
+        if points
+            .iter()
+            .any(|point| (trial_lambda - point.x).abs() < min_spacing)
         {
             break;
         }
 
-        // Evaluate at new slam
-        let p_new = x0 + slam * step;
-        let f_new = fcn.call(p_new.as_slice());
+        let trial_value = evaluate_step(fcn, start, step, trial_lambda);
 
-        if f_new < fvmin {
-            fvmin = f_new;
-            xvmin = slam;
+        if trial_value < best_value {
+            best_lambda = trial_lambda;
+            best_value = trial_value;
         }
 
-        // Replace the worst of the 3 points
-        let new_pt = MnParabolaPoint::new(slam, f_new);
+        replace_worst_point(&mut points, MnParabolaPoint::new(trial_lambda, trial_value));
+        points = sorted_points(points);
 
-        // Find which existing point has the highest f value
-        if pt0.y > pt1.y && pt0.y > pt2.y {
-            pt0 = new_pt;
-        } else if pt2.y > pt1.y {
-            pt2 = new_pt;
-        } else {
-            pt1 = new_pt;
-        }
-
-        // Re-sort
-        let mut pts = [pt0, pt1, pt2];
-        pts.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
-        pt0 = pts[0];
-        pt1 = pts[1];
-        pt2 = pts[2];
-
-        // Check convergence: improvement is tiny
-        if (fvmin - f0).abs() < f0.abs() * prec.eps() {
+        if (best_value - start_value).abs() < start_value.abs() * prec.eps() {
             break;
         }
     }
 
-    MnParabolaPoint::new(xvmin, fvmin)
+    MnParabolaPoint::new(best_lambda, best_value)
+}
+
+fn evaluate_step(fcn: &MnFcn, start: &DVector<f64>, direction: &DVector<f64>, lambda: f64) -> f64 {
+    let candidate = start + lambda * direction;
+    fcn.call(candidate.as_slice())
+}
+
+fn sorted_points(mut points: [MnParabolaPoint; 3]) -> [MnParabolaPoint; 3] {
+    points.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap_or(std::cmp::Ordering::Equal));
+    points
+}
+
+fn replace_worst_point(points: &mut [MnParabolaPoint; 3], new_point: MnParabolaPoint) {
+    let mut worst_index = 0;
+    for index in 1..points.len() {
+        let order = points[index]
+            .y
+            .partial_cmp(&points[worst_index].y)
+            .unwrap_or(std::cmp::Ordering::Equal);
+        if order != std::cmp::Ordering::Less {
+            worst_index = index;
+        }
+    }
+    points[worst_index] = new_point;
 }
 
 pub fn do_eval(fcn: &MnFcn, x: &[f64]) -> f64 {
     fcn.call(x)
 }
 
-/// Compatibility wrapper for ROOT `CubicSearch` naming.
+/// Compatibility wrapper for callers using cubic-search terminology.
 pub fn cubic_search(
     fcn: &MnFcn,
     params: &MinimumParameters,
@@ -181,7 +152,7 @@ pub fn cubic_search(
     mn_linesearch(fcn, params, step, gdel, prec)
 }
 
-/// Compatibility wrapper for ROOT `BrentSearch` naming.
+/// Compatibility wrapper for callers using Brent-search terminology.
 pub fn brent_search(
     fcn: &MnFcn,
     params: &MinimumParameters,
@@ -221,11 +192,83 @@ mod tests {
         let result = mn_linesearch(&fcn, &start, &step, gdel, &prec);
 
         // Optimal step for f(2-λ) = (2-λ)² is λ=2, giving f=0
+        assert!(
+            (result.x - 2.0).abs() < 0.1,
+            "line search should find lambda near 2, got {}",
+            result.x
+        );
         assert!(result.y < 4.0, "line search should improve: f={}", result.y);
         assert!(
             result.y < 0.1,
             "line search should find near-minimum: f={}",
             result.y
         );
+    }
+
+    #[test]
+    fn linesearch_non_descent_direction_does_not_make_result_worse() {
+        let params = vec![MinuitParameter::new(0, "x", 1.0, 0.1)];
+        let trafo = MnUserTransformation::new(params);
+        let fcn = MnFcn::new(&Quadratic, &trafo);
+
+        let start = MinimumParameters::new(DVector::from_vec(vec![1.0]), 1.0);
+        let step = DVector::from_vec(vec![1.0]);
+        let gdel = 2.0;
+        let prec = MnMachinePrecision::new();
+
+        let result = mn_linesearch(&fcn, &start, &step, gdel, &prec);
+
+        assert!(result.x.is_finite());
+        assert!(
+            result.y <= 1.0,
+            "non-descent search should keep the best known value, got {}",
+            result.y
+        );
+    }
+
+    #[test]
+    fn linesearch_clamps_large_interpolated_step() {
+        let params = vec![MinuitParameter::new(0, "x", 10.0, 0.1)];
+        let trafo = MnUserTransformation::new(params);
+        let fcn = MnFcn::new(&Quadratic, &trafo);
+
+        let start = MinimumParameters::new(DVector::from_vec(vec![10.0]), 100.0);
+        let step = DVector::from_vec(vec![-1.0]);
+        let gdel = -20.0;
+        let prec = MnMachinePrecision::new();
+
+        let result = mn_linesearch(&fcn, &start, &step, gdel, &prec);
+
+        assert!(result.x.is_finite());
+        assert!(
+            result.x.abs() <= 20.0,
+            "line search ran away to {}",
+            result.x
+        );
+        assert!(result.y < 100.0);
+    }
+
+    struct Constant;
+    impl FCN for Constant {
+        fn value(&self, _p: &[f64]) -> f64 {
+            7.0
+        }
+    }
+
+    #[test]
+    fn linesearch_degenerate_parabola_is_finite_and_no_worse() {
+        let params = vec![MinuitParameter::new(0, "x", 0.0, 0.1)];
+        let trafo = MnUserTransformation::new(params);
+        let fcn = MnFcn::new(&Constant, &trafo);
+
+        let start = MinimumParameters::new(DVector::from_vec(vec![0.0]), 7.0);
+        let step = DVector::from_vec(vec![1.0]);
+        let prec = MnMachinePrecision::new();
+
+        let result = mn_linesearch(&fcn, &start, &step, 0.0, &prec);
+
+        assert!(result.x.is_finite());
+        assert!(result.y.is_finite());
+        assert_eq!(result.y, 7.0);
     }
 }

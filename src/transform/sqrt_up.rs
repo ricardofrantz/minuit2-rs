@@ -3,8 +3,8 @@ use crate::precision::MnMachinePrecision;
 
 /// Square-root transform for upper-bounded parameters.
 ///
-/// Maps (-∞, upper\] ↔ (-∞, +∞).
-/// Exact formulas from SqrtUpParameterTransformation.cxx.
+/// Maps `x in (-inf, upper]` to an unconstrained internal coordinate with
+/// `x = upper + 1 - sqrt(y^2 + 1)`.
 pub struct SqrtUpTransform;
 
 impl SqrtUpTransform {

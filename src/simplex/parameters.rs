@@ -1,8 +1,7 @@
 //! Simplex vertex storage with best/worst tracking.
 //!
-//! Replaces SimplexParameters.h/.cxx. Stores N+1 vertices (each a parameter
-//! vector + function value) and tracks indices of the best (lowest) and
-//! worst (highest) function values.
+//! Stores `N + 1` vertices, each as a parameter vector plus function value,
+//! and tracks the best and worst function values.
 
 #[derive(Debug, Clone)]
 pub struct SimplexParameters {

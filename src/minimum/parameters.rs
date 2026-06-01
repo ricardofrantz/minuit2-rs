@@ -1,7 +1,7 @@
 //! Internal parameter values at a point in the minimization.
 //!
-//! Replaces BasicMinimumParameters.h. Stores the parameter vector (internal space),
-//! step sizes, and function value at this point.
+//! Stores the parameter vector in internal space, step sizes, and function
+//! value at this point.
 
 use nalgebra::DVector;
 

@@ -5,8 +5,11 @@ use crate::precision::MnMachinePrecision;
 
 /// Sine transform for doubly-bounded parameters.
 ///
-/// Maps \[lower, upper\] ↔ (-∞, +∞) using arcsin/sin.
-/// Exact formulas from SinParameterTransformation.cxx.
+/// Maps a bounded external parameter `x in [lower, upper]` to an internal
+/// angle `theta` with
+/// `x = lower + (upper - lower) * (sin(theta) + 1) / 2`.
+/// Near exact bounds, the inverse is clamped away from `+/- pi/2` so the
+/// derivative remains numerically usable.
 pub struct SinTransform;
 
 impl SinTransform {
@@ -18,29 +21,28 @@ impl SinTransform {
 }
 
 impl ParameterTransform for SinTransform {
-    fn int2ext(&self, value: f64, upper: f64, lower: f64) -> f64 {
-        lower + 0.5 * (upper - lower) * (value.sin() + 1.0)
+    fn int2ext(&self, angle: f64, upper: f64, lower: f64) -> f64 {
+        let width = upper - lower;
+        lower + 0.5 * width * (angle.sin() + 1.0)
     }
 
     fn ext2int(&self, value: f64, upper: f64, lower: f64, prec: &MnMachinePrecision) -> f64 {
-        let piby2 = FRAC_PI_2;
-        let distnn = 8.0 * (prec.eps2()).sqrt();
-        let vlimhi = piby2 - distnn;
-        let vlimlo = -piby2 + distnn;
+        let width = upper - lower;
+        let normalized = 2.0 * (value - lower) / width - 1.0;
 
-        let yy = 2.0 * (value - lower) / (upper - lower) - 1.0;
-        let yy2 = yy.abs();
+        let boundary_margin = 8.0 * prec.eps2().sqrt();
+        let max_angle = FRAC_PI_2 - boundary_margin;
+        let min_angle = -FRAC_PI_2 + boundary_margin;
 
-        if yy2 >= 1.0 - distnn {
-            // At boundary — clamp to avoid numerical issues
-            if yy < 0.0 { vlimlo } else { vlimhi }
-        } else {
-            yy.asin()
+        match normalized {
+            n if n <= -1.0 + boundary_margin => min_angle,
+            n if n >= 1.0 - boundary_margin => max_angle,
+            n => n.asin(),
         }
     }
 
-    fn dint2ext(&self, value: f64, upper: f64, lower: f64) -> f64 {
-        0.5 * ((upper - lower) * value.cos()).abs()
+    fn dint2ext(&self, angle: f64, upper: f64, lower: f64) -> f64 {
+        0.5 * (upper - lower).abs() * angle.cos().abs()
     }
 }
 
@@ -84,5 +86,29 @@ mod tests {
         let int = t.ext2int(9.9999999999, 10.0, 0.0, &prec);
         let ext = t.int2ext(int, 10.0, 0.0);
         assert!((ext - 10.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn exact_bounds_are_clamped_to_finite_internal_values() {
+        let t = SinTransform;
+        let prec = MnMachinePrecision::new();
+
+        let lower = t.ext2int(0.0, 10.0, 0.0, &prec);
+        let upper = t.ext2int(10.0, 10.0, 0.0, &prec);
+
+        assert!(lower > -FRAC_PI_2);
+        assert!(upper < FRAC_PI_2);
+        assert!(lower.is_finite());
+        assert!(upper.is_finite());
+    }
+
+    #[test]
+    fn dext2int_matches_reciprocal_midpoint_derivative() {
+        let t = SinTransform;
+        let prec = MnMachinePrecision::new();
+
+        let reciprocal = t.dext2int(5.0, 10.0, 0.0, &prec);
+
+        assert!((reciprocal - 0.2).abs() < 1e-15);
     }
 }

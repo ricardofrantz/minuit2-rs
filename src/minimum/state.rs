@@ -1,7 +1,7 @@
 //! State of the minimization at a particular iteration.
 //!
-//! Replaces BasicMinimumState.h. Combines parameters, error matrix, and
-//! gradient at one point in the iteration history.
+//! Combines parameters, error matrix, and gradient at one point in the
+//! iteration history.
 
 use super::error::MinimumError;
 use super::gradient::FunctionGradient;

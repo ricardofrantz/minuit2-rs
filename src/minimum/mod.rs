@@ -1,7 +1,7 @@
 //! Top-level minimization result.
 //!
-//! Replaces BasicFunctionMinimum.h / FunctionMinimum.h. Contains the full
-//! iteration history, final state, user transformation, and validity flags.
+//! Contains the full iteration history, final state, user transformation, and
+//! validity flags.
 
 pub mod error;
 pub mod gradient;

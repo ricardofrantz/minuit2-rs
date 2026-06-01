@@ -1,7 +1,7 @@
 //! Two-point numerical gradient calculator.
 //!
-//! Replaces Numerical2PGradientCalculator.cxx. Computes the gradient using
-//! central differences: g_i = (f(x+h) - f(x-h)) / 2h, with adaptive step
+//! Computes the gradient using central differences:
+//! `g_i = (f(x+h) - f(x-h)) / 2h`, with adaptive step
 //! sizing refined over multiple cycles. Also computes g2 (second derivative
 //! estimate) and gstep (optimal step size).
 

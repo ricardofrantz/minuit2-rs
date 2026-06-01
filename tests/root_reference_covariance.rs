@@ -9,7 +9,7 @@ enum BoundType {
     Double,
 }
 
-/// Port of ROOT Minuit2 `math/minuit2/test/testCovariance.cxx` intent:
+/// Reference behavior checked against ROOT Minuit2 `math/minuit2/test/testCovariance.cxx`:
 /// transforming covariance internal->external should preserve a known
 /// external covariance for representative bound configurations.
 fn run_covariance_roundtrip(bound_type: BoundType) {
@@ -41,7 +41,7 @@ fn run_covariance_roundtrip(bound_type: BoundType) {
     let n = trafo.variable_parameters();
     assert_eq!(n, 6);
 
-    // ROOT test uses diag=2 and first off-diagonal=-1.
+    // Reference fixture uses diag=2 and first off-diagonal=-1.
     let mut ext_cov = DMatrix::<f64>::zeros(n, n);
     for i in 0..n {
         ext_cov[(i, i)] = 2.0;

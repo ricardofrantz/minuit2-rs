@@ -4,7 +4,7 @@
 //! optimizer (internal) indices. Fixed/const parameters are excluded from
 //! the internal space. Bounded parameters go through transforms.
 //!
-//! Replaces MnUserTransformation.h/.cxx.
+//! Owns parameter transforms and internal/external index mappings.
 
 use crate::parameter::MinuitParameter;
 use crate::precision::MnMachinePrecision;

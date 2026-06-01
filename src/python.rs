@@ -1,8 +1,19 @@
+use numpy::ndarray::Array2;
+use numpy::{IntoPyArray, PyArray1, PyArray2};
+use pyo3::exceptions::{
+    PyIndexError, PyKeyError, PyNotImplementedError, PyRuntimeError, PyTypeError, PyValueError,
+};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyTuple};
+use pyo3::types::{PyDict, PyList, PyTuple};
 use std::collections::{HashMap, HashSet};
 
-use crate::{FCN, FunctionMinimum, MnContours, MnHesse, MnMigrad, MnMinos, MnScan, MnSimplex};
+use crate::{FCN, FunctionMinimum, MnContours, MnHesse, MnMigrad, MnMinos, MnSimplex};
+
+// Aliases for the numpy array handles returned by the scan/profile/contour
+// methods (keeps their signatures readable and clippy::type_complexity quiet).
+type Arr1f<'py> = Bound<'py, PyArray1<f64>>;
+type Arr1b<'py> = Bound<'py, PyArray1<bool>>;
+type Arr2f<'py> = Bound<'py, PyArray2<f64>>;
 
 // ============================================================================
 // FCN Wrapper
@@ -10,9 +21,14 @@ use crate::{FCN, FunctionMinimum, MnContours, MnHesse, MnMigrad, MnMinos, MnScan
 
 struct PythonFCN {
     fcn: Py<PyAny>,
+    errordef: f64,
 }
 
 impl FCN for PythonFCN {
+    fn error_def(&self) -> f64 {
+        self.errordef
+    }
+
     fn value(&self, par: &[f64]) -> f64 {
         Python::attach(|py| {
             let Ok(args) = PyTuple::new(py, par) else {
@@ -33,56 +49,636 @@ impl FCN for PythonFCN {
 // Minuit Class
 // ============================================================================
 
+struct StoredMError {
+    name: String,
+    lower: f64,
+    upper: f64,
+    is_valid: bool,
+    lower_valid: bool,
+    upper_valid: bool,
+    at_lower_limit: bool,
+    at_upper_limit: bool,
+    at_lower_max_fcn: bool,
+    at_upper_max_fcn: bool,
+    lower_new_min: bool,
+    upper_new_min: bool,
+    nfcn: usize,
+    min: f64,
+}
+
+#[pyclass(frozen)]
+struct FMin {
+    fval: f64,
+    edm: f64,
+    nfcn: usize,
+    errordef: f64,
+    is_valid: bool,
+    has_valid_parameters: bool,
+    has_covariance: bool,
+    has_made_posdef_covar: bool,
+    is_above_max_edm: bool,
+    has_reached_call_limit: bool,
+}
+
+#[pymethods]
+impl FMin {
+    #[getter]
+    fn fval(&self) -> f64 {
+        self.fval
+    }
+
+    #[getter]
+    fn edm(&self) -> f64 {
+        self.edm
+    }
+
+    #[getter]
+    fn nfcn(&self) -> usize {
+        self.nfcn
+    }
+
+    #[getter]
+    fn errordef(&self) -> f64 {
+        self.errordef
+    }
+
+    #[getter]
+    fn is_valid(&self) -> bool {
+        self.is_valid
+    }
+
+    #[getter]
+    fn has_valid_parameters(&self) -> bool {
+        self.has_valid_parameters
+    }
+
+    #[getter]
+    fn has_covariance(&self) -> bool {
+        self.has_covariance
+    }
+
+    #[getter]
+    fn has_made_posdef_covar(&self) -> bool {
+        self.has_made_posdef_covar
+    }
+
+    #[getter]
+    fn is_above_max_edm(&self) -> bool {
+        self.is_above_max_edm
+    }
+
+    #[getter]
+    fn has_reached_call_limit(&self) -> bool {
+        self.has_reached_call_limit
+    }
+}
+
+impl FMin {
+    fn from_minimum(m: &FunctionMinimum) -> Self {
+        Self {
+            fval: m.fval(),
+            edm: m.edm(),
+            nfcn: m.nfcn(),
+            errordef: m.up(),
+            is_valid: m.is_valid(),
+            has_valid_parameters: m.has_valid_parameters(),
+            has_covariance: m.user_state().covariance().is_some(),
+            has_made_posdef_covar: m.has_made_pos_def_covar(),
+            is_above_max_edm: m.is_above_max_edm(),
+            has_reached_call_limit: m.reached_call_limit(),
+        }
+    }
+}
+
+#[pyclass(frozen)]
+struct MError {
+    name: String,
+    lower: f64,
+    upper: f64,
+    is_valid: bool,
+    lower_valid: bool,
+    upper_valid: bool,
+    at_lower_limit: bool,
+    at_upper_limit: bool,
+    at_lower_max_fcn: bool,
+    at_upper_max_fcn: bool,
+    lower_new_min: bool,
+    upper_new_min: bool,
+    nfcn: usize,
+    min: f64,
+}
+
+#[pymethods]
+impl MError {
+    #[getter]
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    #[getter]
+    fn lower(&self) -> f64 {
+        self.lower
+    }
+
+    #[getter]
+    fn upper(&self) -> f64 {
+        self.upper
+    }
+
+    #[getter]
+    fn is_valid(&self) -> bool {
+        self.is_valid
+    }
+
+    #[getter]
+    fn lower_valid(&self) -> bool {
+        self.lower_valid
+    }
+
+    #[getter]
+    fn upper_valid(&self) -> bool {
+        self.upper_valid
+    }
+
+    #[getter]
+    fn at_lower_limit(&self) -> bool {
+        self.at_lower_limit
+    }
+
+    #[getter]
+    fn at_upper_limit(&self) -> bool {
+        self.at_upper_limit
+    }
+
+    #[getter]
+    fn at_lower_max_fcn(&self) -> bool {
+        self.at_lower_max_fcn
+    }
+
+    #[getter]
+    fn at_upper_max_fcn(&self) -> bool {
+        self.at_upper_max_fcn
+    }
+
+    #[getter]
+    fn lower_new_min(&self) -> bool {
+        self.lower_new_min
+    }
+
+    #[getter]
+    fn upper_new_min(&self) -> bool {
+        self.upper_new_min
+    }
+
+    #[getter]
+    fn nfcn(&self) -> usize {
+        self.nfcn
+    }
+
+    #[getter]
+    fn min(&self) -> f64 {
+        self.min
+    }
+}
+
+impl MError {
+    fn from_stored(s: &StoredMError) -> Self {
+        Self {
+            name: s.name.clone(),
+            lower: s.lower,
+            upper: s.upper,
+            is_valid: s.is_valid,
+            lower_valid: s.lower_valid,
+            upper_valid: s.upper_valid,
+            at_lower_limit: s.at_lower_limit,
+            at_upper_limit: s.at_upper_limit,
+            at_lower_max_fcn: s.at_lower_max_fcn,
+            at_upper_max_fcn: s.at_upper_max_fcn,
+            lower_new_min: s.lower_new_min,
+            upper_new_min: s.upper_new_min,
+            nfcn: s.nfcn,
+            min: s.min,
+        }
+    }
+}
+
+#[pyclass(frozen)]
+struct Param {
+    number: usize,
+    name: String,
+    value: f64,
+    error: f64,
+    is_fixed: bool,
+    lower_limit: Option<f64>,
+    upper_limit: Option<f64>,
+    has_limits: bool,
+}
+
+#[pymethods]
+impl Param {
+    #[getter]
+    fn number(&self) -> usize {
+        self.number
+    }
+
+    #[getter]
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    #[getter]
+    fn value(&self) -> f64 {
+        self.value
+    }
+
+    #[getter]
+    fn error(&self) -> f64 {
+        self.error
+    }
+
+    #[getter]
+    fn is_fixed(&self) -> bool {
+        self.is_fixed
+    }
+
+    #[getter]
+    fn lower_limit(&self) -> Option<f64> {
+        self.lower_limit
+    }
+
+    #[getter]
+    fn upper_limit(&self) -> Option<f64> {
+        self.upper_limit
+    }
+
+    #[getter]
+    fn has_limits(&self) -> bool {
+        self.has_limits
+    }
+}
+
+// ============================================================================
+// Parameter views (iminuit-style indexable, mutable, persisting accessors)
+// ============================================================================
+
+/// Map a non-finite limit (±inf) or `None` to `None` (= unbounded that side).
+fn finite_or_none(v: Option<f64>) -> Option<f64> {
+    match v {
+        Some(x) if x.is_finite() => Some(x),
+        _ => None,
+    }
+}
+
+/// Resolve an int (incl. negative) or str key to a parameter name.
+fn resolve_param_name(names: &[String], key: &Bound<'_, PyAny>) -> PyResult<String> {
+    if let Ok(i) = key.extract::<isize>() {
+        let n = names.len() as isize;
+        let idx = if i < 0 { i + n } else { i };
+        if idx < 0 || idx >= n {
+            return Err(PyIndexError::new_err("parameter index out of range"));
+        }
+        Ok(names[idx as usize].clone())
+    } else if let Ok(s) = key.extract::<String>() {
+        if names.iter().any(|x| x == &s) {
+            Ok(s)
+        } else {
+            Err(PyKeyError::new_err(s))
+        }
+    } else {
+        Err(PyTypeError::new_err("parameter key must be int or str"))
+    }
+}
+
+fn list_iter(list: Bound<'_, PyList>) -> PyResult<Py<PyAny>> {
+    Ok(list.into_any().try_iter()?.into_any().unbind())
+}
+
+#[pyclass]
+struct ValueView {
+    owner: Py<Minuit>,
+}
+
+#[pymethods]
+impl ValueView {
+    fn __getitem__(&self, py: Python<'_>, key: Bound<'_, PyAny>) -> PyResult<f64> {
+        let m = self.owner.borrow(py);
+        let name = resolve_param_name(&m.names, &key)?;
+        Ok(*m.values.get(&name).unwrap_or(&0.0))
+    }
+    fn __setitem__(&self, py: Python<'_>, key: Bound<'_, PyAny>, value: f64) -> PyResult<()> {
+        let mut m = self.owner.borrow_mut(py);
+        let name = resolve_param_name(&m.names, &key)?;
+        m.values.insert(name, value);
+        Ok(())
+    }
+    fn __len__(&self, py: Python<'_>) -> usize {
+        self.owner.borrow(py).names.len()
+    }
+    fn __iter__(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let m = self.owner.borrow(py);
+        let vals: Vec<f64> = m.names.iter().map(|n| *m.values.get(n).unwrap_or(&0.0)).collect();
+        list_iter(PyList::new(py, vals)?)
+    }
+    fn to_dict(&self, py: Python<'_>) -> HashMap<String, f64> {
+        let m = self.owner.borrow(py);
+        m.names.iter().map(|n| (n.clone(), *m.values.get(n).unwrap_or(&0.0))).collect()
+    }
+    fn __repr__(&self, py: Python<'_>) -> String {
+        format!("<ValueView {:?}>", self.to_dict(py))
+    }
+}
+
+#[pyclass]
+struct ErrorView {
+    owner: Py<Minuit>,
+}
+
+#[pymethods]
+impl ErrorView {
+    fn __getitem__(&self, py: Python<'_>, key: Bound<'_, PyAny>) -> PyResult<f64> {
+        let m = self.owner.borrow(py);
+        let name = resolve_param_name(&m.names, &key)?;
+        Ok(*m.errors.get(&name).unwrap_or(&0.1))
+    }
+    fn __setitem__(&self, py: Python<'_>, key: Bound<'_, PyAny>, value: f64) -> PyResult<()> {
+        let mut m = self.owner.borrow_mut(py);
+        let name = resolve_param_name(&m.names, &key)?;
+        m.errors.insert(name, value);
+        Ok(())
+    }
+    fn __len__(&self, py: Python<'_>) -> usize {
+        self.owner.borrow(py).names.len()
+    }
+    fn __iter__(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let m = self.owner.borrow(py);
+        let vals: Vec<f64> = m.names.iter().map(|n| *m.errors.get(n).unwrap_or(&0.1)).collect();
+        list_iter(PyList::new(py, vals)?)
+    }
+    fn to_dict(&self, py: Python<'_>) -> HashMap<String, f64> {
+        let m = self.owner.borrow(py);
+        m.names.iter().map(|n| (n.clone(), *m.errors.get(n).unwrap_or(&0.1))).collect()
+    }
+    fn __repr__(&self, py: Python<'_>) -> String {
+        format!("<ErrorView {:?}>", self.to_dict(py))
+    }
+}
+
+#[pyclass]
+struct FixedView {
+    owner: Py<Minuit>,
+}
+
+#[pymethods]
+impl FixedView {
+    fn __getitem__(&self, py: Python<'_>, key: Bound<'_, PyAny>) -> PyResult<bool> {
+        let m = self.owner.borrow(py);
+        let name = resolve_param_name(&m.names, &key)?;
+        Ok(m.fixed.contains(&name))
+    }
+    fn __setitem__(&self, py: Python<'_>, key: Bound<'_, PyAny>, value: bool) -> PyResult<()> {
+        let mut m = self.owner.borrow_mut(py);
+        let name = resolve_param_name(&m.names, &key)?;
+        if value {
+            m.fixed.insert(name);
+        } else {
+            m.fixed.remove(&name);
+        }
+        Ok(())
+    }
+    fn __len__(&self, py: Python<'_>) -> usize {
+        self.owner.borrow(py).names.len()
+    }
+    fn __iter__(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let m = self.owner.borrow(py);
+        let vals: Vec<bool> = m.names.iter().map(|n| m.fixed.contains(n)).collect();
+        list_iter(PyList::new(py, vals)?)
+    }
+    fn to_dict(&self, py: Python<'_>) -> HashMap<String, bool> {
+        let m = self.owner.borrow(py);
+        m.names.iter().map(|n| (n.clone(), m.fixed.contains(n))).collect()
+    }
+    fn __repr__(&self, py: Python<'_>) -> String {
+        format!("<FixedView {:?}>", self.to_dict(py))
+    }
+}
+
+#[pyclass]
+struct LimitView {
+    owner: Py<Minuit>,
+}
+
+impl LimitView {
+    fn pair(m: &Minuit, name: &str) -> (f64, f64) {
+        match m.limits.get(name) {
+            Some((lo, hi)) => (
+                lo.unwrap_or(f64::NEG_INFINITY),
+                hi.unwrap_or(f64::INFINITY),
+            ),
+            None => (f64::NEG_INFINITY, f64::INFINITY),
+        }
+    }
+}
+
+#[pymethods]
+impl LimitView {
+    fn __getitem__(&self, py: Python<'_>, key: Bound<'_, PyAny>) -> PyResult<(f64, f64)> {
+        let m = self.owner.borrow(py);
+        let name = resolve_param_name(&m.names, &key)?;
+        Ok(Self::pair(&m, &name))
+    }
+    fn __setitem__(&self, py: Python<'_>, key: Bound<'_, PyAny>, value: Bound<'_, PyAny>) -> PyResult<()> {
+        let (lo, hi) = if value.is_none() {
+            (None, None)
+        } else {
+            let (l, u): (Option<f64>, Option<f64>) = value.extract()?;
+            (finite_or_none(l), finite_or_none(u))
+        };
+        let mut m = self.owner.borrow_mut(py);
+        let name = resolve_param_name(&m.names, &key)?;
+        if lo.is_none() && hi.is_none() {
+            m.limits.remove(&name);
+        } else {
+            m.limits.insert(name, (lo, hi));
+        }
+        Ok(())
+    }
+    fn __len__(&self, py: Python<'_>) -> usize {
+        self.owner.borrow(py).names.len()
+    }
+    fn __iter__(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let m = self.owner.borrow(py);
+        let vals: Vec<(f64, f64)> = m.names.iter().map(|n| Self::pair(&m, n)).collect();
+        list_iter(PyList::new(py, vals)?)
+    }
+    fn to_dict(&self, py: Python<'_>) -> HashMap<String, (f64, f64)> {
+        let m = self.owner.borrow(py);
+        m.names.iter().map(|n| (n.clone(), Self::pair(&m, n))).collect()
+    }
+    fn __repr__(&self, py: Python<'_>) -> String {
+        format!("<LimitView {:?}>", self.to_dict(py))
+    }
+}
+
 #[pyclass(name = "Minuit")]
 struct Minuit {
     fcn: Py<PyAny>,
     names: Vec<String>,
     values: HashMap<String, f64>,
     errors: HashMap<String, f64>,
-    limits: HashMap<String, (f64, f64)>,
+    limits: HashMap<String, (Option<f64>, Option<f64>)>,
     fixed: HashSet<String>,
     last_minimum: Option<FunctionMinimum>,
     strategy: u32,
     tolerance: f64,
     max_calls: Option<usize>,
+    errordef: f64,
+    merrors: HashMap<String, StoredMError>,
+    init_values: HashMap<String, f64>,
+    init_errors: HashMap<String, f64>,
+    init_fixed: HashSet<String>,
+    init_limits: HashMap<String, (Option<f64>, Option<f64>)>,
 }
 
 #[pymethods]
 impl Minuit {
+    #[classattr]
+    const LEAST_SQUARES: f64 = 1.0;
+    #[classattr]
+    const LIKELIHOOD: f64 = 0.5;
+
     #[new]
-    #[pyo3(signature = (fcn, **params))]
-    fn new(fcn: Py<PyAny>, params: Option<Bound<'_, PyDict>>) -> PyResult<Self> {
-        let mut names = Vec::new();
+    #[pyo3(signature = (fcn, *args, name=None, **kwds))]
+    fn new(
+        py: Python<'_>,
+        fcn: Py<PyAny>,
+        args: Vec<f64>,
+        name: Option<Vec<String>>,
+        kwds: Option<Bound<'_, PyDict>>,
+    ) -> PyResult<Self> {
+        let names = if let Some(name) = name {
+            name
+        } else {
+            let mut introspected = Vec::new();
+            if let Ok(inspect) = py.import("inspect")
+                && let Ok(sig) = inspect.call_method1("signature", (&fcn,))
+                && let Ok(params_map) = sig.getattr("parameters")
+                && let Ok(keys) = params_map.call_method0("keys")
+                && let Ok(iter) = keys.try_iter()
+            {
+                for param_name in iter {
+                    let param_name = param_name?;
+                    let param = params_map.call_method1("__getitem__", (&param_name,))?;
+                    let kind = param.getattr("kind")?.extract::<u8>()?;
+                    if kind != 2 && kind != 4 {
+                        introspected.push(param_name.extract::<String>()?);
+                    }
+                }
+            }
+            if introspected.is_empty() {
+                let mut fallback = Vec::new();
+                if let Some(p) = &kwds {
+                    for (key, _) in p.iter() {
+                        fallback.push(key.extract::<String>()?);
+                    }
+                }
+                fallback
+            } else {
+                introspected
+            }
+        };
         let mut values = HashMap::new();
         let mut errors = HashMap::new();
+        let fixed = HashSet::new();
+        let limits = HashMap::new();
 
-        if let Some(p) = params {
+        for name in &names {
+            values.insert(name.clone(), 0.0);
+            errors.insert(name.clone(), 0.1);
+        }
+
+        if args.len() > names.len() {
+            return Err(PyValueError::new_err("too many positional arguments"));
+        }
+        for (i, val) in args.into_iter().enumerate() {
+            values.insert(names[i].clone(), val);
+        }
+
+        if let Some(p) = kwds {
             for (name, value) in p.iter() {
                 let name_str = name.extract::<String>()?;
+                if !values.contains_key(&name_str) {
+                    return Err(PyValueError::new_err(format!(
+                        "unknown parameter: {}",
+                        name_str
+                    )));
+                }
                 let val = value.extract::<f64>()?;
-                names.push(name_str.clone());
-                values.insert(name_str.clone(), val);
-                errors.insert(name_str, 0.1);
+                values.insert(name_str, val);
             }
         }
+
+        let init_values = values.clone();
+        let init_errors = errors.clone();
+        let init_fixed = fixed.clone();
+        let init_limits = limits.clone();
 
         Ok(Minuit {
             fcn,
             names,
             values,
             errors,
-            limits: HashMap::new(),
-            fixed: HashSet::new(),
+            limits,
+            fixed,
             last_minimum: None,
             strategy: 1,
             tolerance: 0.1,
             max_calls: None,
+            errordef: 1.0,
+            merrors: HashMap::new(),
+            init_values,
+            init_errors,
+            init_fixed,
+            init_limits,
         })
     }
 
     #[getter]
-    fn get_values(&self) -> HashMap<String, f64> {
-        self.values.clone()
+    fn get_errordef(&self) -> f64 {
+        self.errordef
+    }
+
+    #[setter]
+    fn set_errordef(&mut self, v: f64) {
+        self.errordef = v;
+    }
+
+    #[getter]
+    fn get_strategy(&self) -> u32 {
+        self.strategy
+    }
+
+    #[setter]
+    fn set_strategy(&mut self, v: u32) -> PyResult<()> {
+        if v > 2 {
+            return Err(PyValueError::new_err("strategy must be 0, 1, or 2"));
+        }
+        self.strategy = v;
+        Ok(())
+    }
+
+    #[getter]
+    fn get_tol(&self) -> f64 {
+        self.tolerance
+    }
+
+    #[setter]
+    fn set_tol(&mut self, v: f64) {
+        self.tolerance = v;
+    }
+
+    #[getter]
+    fn get_values(slf: Bound<'_, Self>) -> ValueView {
+        ValueView { owner: slf.unbind() }
     }
 
     #[setter]
@@ -95,8 +691,8 @@ impl Minuit {
     }
 
     #[getter]
-    fn get_errors(&self) -> HashMap<String, f64> {
-        self.errors.clone()
+    fn get_errors(slf: Bound<'_, Self>) -> ErrorView {
+        ErrorView { owner: slf.unbind() }
     }
 
     #[setter]
@@ -109,16 +705,8 @@ impl Minuit {
     }
 
     #[getter]
-    fn get_limits(&self) -> HashMap<String, (Option<f64>, Option<f64>)> {
-        let mut res = HashMap::new();
-        for name in &self.names {
-            if let Some((l, u)) = self.limits.get(name) {
-                res.insert(name.clone(), (Some(*l), Some(*u)));
-            } else {
-                res.insert(name.clone(), (None, None));
-            }
-        }
-        res
+    fn get_limits(slf: Bound<'_, Self>) -> LimitView {
+        LimitView { owner: slf.unbind() }
     }
 
     #[setter]
@@ -133,15 +721,12 @@ impl Minuit {
             } else if let Ok(tuple) = value.cast::<PyTuple>()
                 && tuple.len() == 2
             {
-                let l = tuple.get_item(0)?.extract::<Option<f64>>()?;
-                let u = tuple.get_item(1)?.extract::<Option<f64>>()?;
-                match (l, u) {
-                    (Some(low), Some(up)) => {
-                        self.limits.insert(name, (low, up));
-                    }
-                    _ => {
-                        self.limits.remove(&name);
-                    }
+                let l = finite_or_none(tuple.get_item(0)?.extract::<Option<f64>>()?);
+                let u = finite_or_none(tuple.get_item(1)?.extract::<Option<f64>>()?);
+                if l.is_none() && u.is_none() {
+                    self.limits.remove(&name);
+                } else {
+                    self.limits.insert(name, (l, u));
                 }
             }
         }
@@ -149,8 +734,8 @@ impl Minuit {
     }
 
     #[getter]
-    fn get_fixed(&self) -> Vec<String> {
-        self.fixed.iter().cloned().collect()
+    fn get_fixed(slf: Bound<'_, Self>) -> FixedView {
+        FixedView { owner: slf.unbind() }
     }
 
     #[setter]
@@ -200,125 +785,481 @@ impl Minuit {
             .map(|s| s.to_vec())
     }
 
-    fn migrad(&mut self, py: Python<'_>) -> PyResult<()> {
-        let fcn = PythonFCN {
-            fcn: self.fcn.clone_ref(py),
-        };
-        let minimizer = self.build_migrad();
-        let result = minimizer.minimize(&fcn);
-        self.update_state_from_result(&result);
-        self.last_minimum = Some(result);
-        Ok(())
+    #[getter]
+    fn get_fmin(&self) -> Option<FMin> {
+        self.last_minimum.as_ref().map(FMin::from_minimum)
     }
 
-    fn simplex(&mut self, py: Python<'_>) -> PyResult<()> {
-        let fcn = PythonFCN {
-            fcn: self.fcn.clone_ref(py),
-        };
-        let minimizer = self.build_simplex();
-        let result = minimizer.minimize(&fcn);
-        self.update_state_from_result(&result);
-        self.last_minimum = Some(result);
-        Ok(())
+    #[getter]
+    fn get_params(&self) -> Vec<Param> {
+        self.names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| {
+                let value = *self.values.get(name).unwrap_or(&0.0);
+                let error = *self.errors.get(name).unwrap_or(&0.1);
+                let is_fixed = self.fixed.contains(name);
+                let (lower_limit, upper_limit) =
+                    self.limits.get(name).copied().unwrap_or((None, None));
+                let has_limits = lower_limit.is_some() || upper_limit.is_some();
+                Param {
+                    number: i,
+                    name: name.clone(),
+                    value,
+                    error,
+                    is_fixed,
+                    lower_limit,
+                    upper_limit,
+                    has_limits,
+                }
+            })
+            .collect()
     }
 
-    fn hesse(&mut self, py: Python<'_>) -> PyResult<()> {
-        if let Some(min) = &self.last_minimum {
+    #[getter]
+    fn get_merrors(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+        let dict = PyDict::new(py);
+        for (k, v) in &self.merrors {
+            dict.set_item(k, Py::new(py, MError::from_stored(v))?)?;
+        }
+        Ok(dict.into())
+    }
+
+    #[getter]
+    fn get_nfcn(&self) -> usize {
+        self.last_minimum.as_ref().map(|m| m.nfcn()).unwrap_or(0)
+    }
+
+    #[getter]
+    fn get_npar(&self) -> usize {
+        self.names.len()
+    }
+
+    #[getter]
+    fn get_nfit(&self) -> usize {
+        self.names
+            .iter()
+            .filter(|n| !self.fixed.contains(*n))
+            .count()
+    }
+
+    #[getter]
+    fn get_parameters(&self) -> Vec<String> {
+        self.names.clone()
+    }
+
+    #[getter]
+    fn get_accurate(&self) -> Option<bool> {
+        self.last_minimum
+            .as_ref()
+            .map(|m| m.is_valid() && !m.has_made_pos_def_covar())
+    }
+
+    fn reset(mut slf: PyRefMut<'_, Self>) -> Py<Minuit> {
+        slf.values = slf.init_values.clone();
+        slf.errors = slf.init_errors.clone();
+        slf.fixed = slf.init_fixed.clone();
+        slf.limits = slf.init_limits.clone();
+        slf.last_minimum = None;
+        slf.merrors.clear();
+        slf.into()
+    }
+
+    #[pyo3(signature = (key, value))]
+    fn fixto(
+        mut slf: PyRefMut<'_, Self>,
+        key: Bound<'_, PyAny>,
+        value: f64,
+    ) -> PyResult<Py<Minuit>> {
+        let name: String = if let Ok(idx) = key.extract::<usize>() {
+            slf.names
+                .get(idx)
+                .ok_or_else(|| PyValueError::new_err(format!("parameter index {} out of range", idx)))?
+                .clone()
+        } else {
+            let s = key.extract::<String>()?;
+            if !slf.names.contains(&s) {
+                return Err(PyValueError::new_err(format!("unknown parameter: {}", s)));
+            }
+            s
+        };
+        slf.values.insert(name.clone(), value);
+        slf.fixed.insert(name);
+        Ok(slf.into())
+    }
+
+    fn migrad(mut slf: PyRefMut<'_, Self>, py: Python<'_>) -> PyResult<Py<Minuit>> {
+        {
             let fcn = PythonFCN {
-                fcn: self.fcn.clone_ref(py),
+                fcn: slf.fcn.clone_ref(py),
+                errordef: slf.errordef,
             };
-            let mut hesse = MnHesse::new().with_strategy(self.strategy);
-            if let Some(max) = self.max_calls {
+            slf.merrors.clear();
+            let minimizer = slf.build_migrad();
+            let result = minimizer.minimize(&fcn);
+            slf.update_state_from_result(&result);
+            slf.last_minimum = Some(result);
+        }
+        Ok(slf.into())
+    }
+
+    fn simplex(mut slf: PyRefMut<'_, Self>, py: Python<'_>) -> PyResult<Py<Minuit>> {
+        {
+            let fcn = PythonFCN {
+                fcn: slf.fcn.clone_ref(py),
+                errordef: slf.errordef,
+            };
+            slf.merrors.clear();
+            let minimizer = slf.build_simplex();
+            let result = minimizer.minimize(&fcn);
+            slf.update_state_from_result(&result);
+            slf.last_minimum = Some(result);
+        }
+        Ok(slf.into())
+    }
+
+    fn hesse(mut slf: PyRefMut<'_, Self>, py: Python<'_>) -> PyResult<Py<Minuit>> {
+        if slf.last_minimum.is_none() {
+            return Err(PyRuntimeError::new_err("Run migrad/simplex first"));
+        }
+
+        {
+            let min = slf.last_minimum.as_ref().unwrap().clone();
+            let fcn = PythonFCN {
+                fcn: slf.fcn.clone_ref(py),
+                errordef: slf.errordef,
+            };
+            let mut hesse = MnHesse::new().with_strategy(slf.strategy);
+            if let Some(max) = slf.max_calls {
                 hesse = hesse.with_max_calls(max);
             }
-            let result = hesse.calculate(&fcn, min);
-            self.update_state_from_result(&result);
-            self.last_minimum = Some(result);
-            Ok(())
-        } else {
-            Err(pyo3::exceptions::PyRuntimeError::new_err(
-                "Run migrad/simplex first",
-            ))
+            // Note: unlike migrad/simplex, hesse refines the covariance without
+            // invalidating existing Minos errors, so merrors is preserved here
+            // (matches iminuit behavior).
+            let result = hesse.calculate(&fcn, &min);
+            slf.update_state_from_result(&result);
+            slf.last_minimum = Some(result);
         }
+        Ok(slf.into())
     }
 
-    fn minos(&mut self, py: Python<'_>) -> PyResult<HashMap<String, HashMap<String, f64>>> {
-        if let Some(min) = &self.last_minimum {
-            let fcn = PythonFCN {
-                fcn: self.fcn.clone_ref(py),
-            };
-            let minos = MnMinos::new(&fcn, min);
-            let mut results = HashMap::new();
-            for (i, name) in self.names.iter().enumerate() {
-                if !self.fixed.contains(name) {
-                    let err = minos.minos_error(i);
-                    let mut entry = HashMap::new();
-                    entry.insert("lower".to_string(), err.lower_error());
-                    entry.insert("upper".to_string(), err.upper_error());
-                    results.insert(name.clone(), entry);
-                }
-            }
-            Ok(results)
-        } else {
-            Err(pyo3::exceptions::PyRuntimeError::new_err(
-                "Run migrad/simplex first",
-            ))
-        }
-    }
-
-    fn scan(
-        &self,
+    #[pyo3(signature = (*parameters))]
+    fn minos(
+        mut slf: PyRefMut<'_, Self>,
         py: Python<'_>,
-        param: String,
-        nsteps: usize,
-        low: f64,
-        high: f64,
-    ) -> PyResult<Vec<(f64, f64)>> {
-        if let Some(min) = &self.last_minimum {
-            let fcn = PythonFCN {
-                fcn: self.fcn.clone_ref(py),
-            };
-            let scan = MnScan::new(&fcn, min);
-            if let Some(idx) = self.names.iter().position(|n| *n == param) {
-                Ok(scan.scan(idx, nsteps, low, high))
+        parameters: Vec<String>,
+    ) -> PyResult<Py<Minuit>> {
+        if slf.last_minimum.is_none() {
+            return Err(PyRuntimeError::new_err("Run migrad/simplex first"));
+        }
+
+        {
+            let min = slf.last_minimum.as_ref().unwrap().clone();
+            let selected: Vec<(usize, String)> = if parameters.is_empty() {
+                slf.names
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, name)| !slf.fixed.contains(*name))
+                    .map(|(i, name)| (i, name.clone()))
+                    .collect()
             } else {
-                Err(pyo3::exceptions::PyValueError::new_err(
-                    "Parameter not found",
-                ))
+                parameters
+                    .iter()
+                    .filter_map(|name| {
+                        if slf.fixed.contains(name) {
+                            None
+                        } else {
+                            slf.names
+                                .iter()
+                                .position(|n| n == name)
+                                .map(|idx| (idx, name.clone()))
+                        }
+                    })
+                    .collect()
+            };
+            let fcn = PythonFCN {
+                fcn: slf.fcn.clone_ref(py),
+                errordef: slf.errordef,
+            };
+            let minos = MnMinos::new(&fcn, &min);
+            let mut results = Vec::with_capacity(selected.len());
+            for (i, name) in selected {
+                let err = minos.minos_error(i);
+                results.push(StoredMError {
+                    name,
+                    // lower_error() is already negative (matches iminuit's
+                    // signed-lower convention); store it as-is.
+                    lower: err.lower_error(),
+                    upper: err.upper_error(),
+                    is_valid: err.is_valid(),
+                    lower_valid: err.lower_valid(),
+                    upper_valid: err.upper_valid(),
+                    at_lower_limit: err.at_lower_limit(),
+                    at_upper_limit: err.at_upper_limit(),
+                    at_lower_max_fcn: err.at_lower_max_fcn(),
+                    at_upper_max_fcn: err.at_upper_max_fcn(),
+                    lower_new_min: err.lower_new_min(),
+                    upper_new_min: err.upper_new_min(),
+                    nfcn: err.nfcn(),
+                    min: err.min(),
+                });
             }
-        } else {
-            Err(pyo3::exceptions::PyRuntimeError::new_err(
-                "Run migrad/simplex first",
-            ))
+            for err in results {
+                slf.merrors.insert(err.name.clone(), err);
+            }
         }
+        Ok(slf.into())
     }
 
-    fn contour(
+    #[pyo3(signature = (vname, *, size=100, bound=2.0, subtract_min=false))]
+    fn profile<'py>(
         &self,
-        py: Python<'_>,
-        par_x: String,
-        par_y: String,
-        npoints: usize,
-    ) -> PyResult<Vec<(f64, f64)>> {
-        if let Some(min) = &self.last_minimum {
+        py: Python<'py>,
+        vname: String,
+        size: usize,
+        bound: f64,
+        subtract_min: bool,
+    ) -> PyResult<(Arr1f<'py>, Arr1f<'py>)> {
+        let _min = self
+            .last_minimum
+            .as_ref()
+            .ok_or_else(|| PyRuntimeError::new_err("Run migrad/simplex first"))?;
+        let idx = self
+            .names
+            .iter()
+            .position(|n| *n == vname)
+            .ok_or_else(|| PyValueError::new_err(format!("Parameter '{}' not found", vname)))?;
+        let v = *self.values.get(&vname).unwrap_or(&0.0);
+        let e = self
+            .errors
+            .get(&vname)
+            .copied()
+            .unwrap_or(0.1)
+            .abs()
+            .max(1e-10);
+        let low = v - bound * e;
+        let high = v + bound * e;
+        let fcn = PythonFCN {
+            fcn: self.fcn.clone_ref(py),
+            errordef: self.errordef,
+        };
+        // Build the grid directly (others held at their fitted values) so the
+        // result has exactly `size` points. MnParameterScan clamps nsteps to
+        // [2, 101], so it cannot honor an arbitrary `size`.
+        let base_pars: Vec<f64> = self
+            .names
+            .iter()
+            .map(|n| *self.values.get(n).unwrap_or(&0.0))
+            .collect();
+        let mut xs = Vec::with_capacity(size);
+        let mut fs = Vec::with_capacity(size);
+        for i in 0..size {
+            let x = if size > 1 {
+                low + i as f64 * (high - low) / (size - 1) as f64
+            } else {
+                v
+            };
+            let mut pars = base_pars.clone();
+            pars[idx] = x;
+            xs.push(x);
+            fs.push(fcn.value(&pars));
+        }
+        if subtract_min {
+            let fmin_val = fs.iter().copied().fold(f64::INFINITY, f64::min);
+            for f in &mut fs {
+                *f -= fmin_val;
+            }
+        }
+        Ok((PyArray1::from_vec(py, xs), PyArray1::from_vec(py, fs)))
+    }
+
+    #[pyo3(signature = (vname, *, size=30, bound=2.0, subtract_min=false))]
+    fn mnprofile<'py>(
+        &self,
+        py: Python<'py>,
+        vname: String,
+        size: usize,
+        bound: f64,
+        subtract_min: bool,
+    ) -> PyResult<(Arr1f<'py>, Arr1f<'py>, Arr1b<'py>)> {
+        let _min = self
+            .last_minimum
+            .as_ref()
+            .ok_or_else(|| PyRuntimeError::new_err("Run migrad/simplex first"))?;
+        self.names
+            .iter()
+            .position(|n| *n == vname)
+            .ok_or_else(|| PyValueError::new_err(format!("Parameter '{}' not found", vname)))?;
+        let v = *self.values.get(&vname).unwrap_or(&0.0);
+        let e = self
+            .errors
+            .get(&vname)
+            .copied()
+            .unwrap_or(0.1)
+            .abs()
+            .max(1e-10);
+        let low = v - bound * e;
+        let high = v + bound * e;
+        let step = if size > 1 {
+            (high - low) / (size - 1) as f64
+        } else {
+            0.0
+        };
+        let mut xs = Vec::with_capacity(size);
+        let mut fs = Vec::with_capacity(size);
+        let mut oks = Vec::with_capacity(size);
+        for i in 0..size {
+            let xi = if size > 1 { low + i as f64 * step } else { v };
+            xs.push(xi);
             let fcn = PythonFCN {
                 fcn: self.fcn.clone_ref(py),
+                errordef: self.errordef,
             };
-            let contours = MnContours::new(&fcn, min).with_strategy(self.strategy);
-            let idx_x =
-                self.names.iter().position(|n| *n == par_x).ok_or_else(|| {
-                    pyo3::exceptions::PyValueError::new_err("Parameter X not found")
-                })?;
-            let idx_y =
-                self.names.iter().position(|n| *n == par_y).ok_or_else(|| {
-                    pyo3::exceptions::PyValueError::new_err("Parameter Y not found")
-                })?;
-            Ok(contours.points(idx_x, idx_y, npoints))
-        } else {
-            Err(pyo3::exceptions::PyRuntimeError::new_err(
-                "Run migrad/simplex first",
-            ))
+            let result = self.build_migrad_with_const(&vname, xi).minimize(&fcn);
+            fs.push(result.fval());
+            oks.push(result.is_valid());
         }
+        if subtract_min {
+            let fmin_val = fs.iter().copied().fold(f64::INFINITY, f64::min);
+            for f in &mut fs {
+                *f -= fmin_val;
+            }
+        }
+        Ok((
+            PyArray1::from_vec(py, xs),
+            PyArray1::from_vec(py, fs),
+            PyArray1::from_vec(py, oks),
+        ))
+    }
+
+    #[pyo3(signature = (x, y, *, cl=None, size=100))]
+    fn mncontour<'py>(
+        &self,
+        py: Python<'py>,
+        x: String,
+        y: String,
+        cl: Option<f64>,
+        size: usize,
+    ) -> PyResult<Arr2f<'py>> {
+        if cl.is_some() {
+            return Err(PyNotImplementedError::new_err(
+                "cl scaling not yet implemented; mncontour uses the errordef-defined level",
+            ));
+        }
+        let min = self
+            .last_minimum
+            .as_ref()
+            .ok_or_else(|| PyRuntimeError::new_err("Run migrad/simplex first"))?;
+        let idx_x = self
+            .names
+            .iter()
+            .position(|n| *n == x)
+            .ok_or_else(|| PyValueError::new_err(format!("Parameter '{}' not found", x)))?;
+        let idx_y = self
+            .names
+            .iter()
+            .position(|n| *n == y)
+            .ok_or_else(|| PyValueError::new_err(format!("Parameter '{}' not found", y)))?;
+        let fcn = PythonFCN {
+            fcn: self.fcn.clone_ref(py),
+            errordef: self.errordef,
+        };
+        let contours = MnContours::new(&fcn, min).with_strategy(self.strategy);
+        let mut pts = contours.points(idx_x, idx_y, size);
+        if let Some(first) = pts.first().copied() {
+            pts.push(first);
+        }
+        let nrows = pts.len();
+        let mut arr = Array2::<f64>::zeros((nrows, 2));
+        for (i, (px, py_val)) in pts.iter().enumerate() {
+            arr[[i, 0]] = *px;
+            arr[[i, 1]] = *py_val;
+        }
+        Ok(arr.into_pyarray(py))
+    }
+
+    #[pyo3(signature = (x, y, *, size=50, bound=2.0, subtract_min=false))]
+    fn contour<'py>(
+        &self,
+        py: Python<'py>,
+        x: String,
+        y: String,
+        size: usize,
+        bound: f64,
+        subtract_min: bool,
+    ) -> PyResult<(Arr1f<'py>, Arr1f<'py>, Arr2f<'py>)> {
+        let min = self
+            .last_minimum
+            .as_ref()
+            .ok_or_else(|| PyRuntimeError::new_err("Run migrad/simplex first"))?;
+        let idx_x = self
+            .names
+            .iter()
+            .position(|n| *n == x)
+            .ok_or_else(|| PyValueError::new_err(format!("Parameter '{}' not found", x)))?;
+        let idx_y = self
+            .names
+            .iter()
+            .position(|n| *n == y)
+            .ok_or_else(|| PyValueError::new_err(format!("Parameter '{}' not found", y)))?;
+        let vx = *self.values.get(&x).unwrap_or(&0.0);
+        let ex = self.errors.get(&x).copied().unwrap_or(0.1).abs().max(1e-10);
+        let vy = *self.values.get(&y).unwrap_or(&0.0);
+        let ey = self.errors.get(&y).copied().unwrap_or(0.1).abs().max(1e-10);
+        let x_low = vx - bound * ex;
+        let x_high = vx + bound * ex;
+        let y_low = vy - bound * ey;
+        let y_high = vy + bound * ey;
+        let xg: Vec<f64> = (0..size)
+            .map(|i| {
+                if size > 1 {
+                    x_low + i as f64 * (x_high - x_low) / (size - 1) as f64
+                } else {
+                    vx
+                }
+            })
+            .collect();
+        let yg: Vec<f64> = (0..size)
+            .map(|j| {
+                if size > 1 {
+                    y_low + j as f64 * (y_high - y_low) / (size - 1) as f64
+                } else {
+                    vy
+                }
+            })
+            .collect();
+        let fmin_val = if subtract_min { min.fval() } else { 0.0 };
+        let fcn = PythonFCN {
+            fcn: self.fcn.clone_ref(py),
+            errordef: self.errordef,
+        };
+        let mut fval2d = Array2::<f64>::zeros((size, size));
+        let base_pars: Vec<f64> = self
+            .names
+            .iter()
+            .map(|n| *self.values.get(n).unwrap_or(&0.0))
+            .collect();
+        for (i, xi) in xg.iter().enumerate() {
+            for (j, yj) in yg.iter().enumerate() {
+                let mut pars = base_pars.clone();
+                pars[idx_x] = *xi;
+                pars[idx_y] = *yj;
+                fval2d[[i, j]] = fcn.value(&pars) - fmin_val;
+            }
+        }
+        Ok((
+            PyArray1::from_vec(py, xg),
+            PyArray1::from_vec(py, yg),
+            fval2d.into_pyarray(py),
+        ))
+    }
+
+    #[pyo3(signature = (ncall=None))]
+    fn scan(&self, ncall: Option<usize>) -> PyResult<()> {
+        let _ = ncall;
+        Err(PyNotImplementedError::new_err(
+            "scan (brute-force global minimizer) is not yet implemented; use profile/mnprofile for 1D scans",
+        ))
     }
 }
 
@@ -335,10 +1276,13 @@ impl Minuit {
             let err = *self.errors.get(name).unwrap_or(&0.1);
             if self.fixed.contains(name) {
                 m = m.add_const(name, val);
-            } else if let Some((l, u)) = self.limits.get(name) {
-                m = m.add_limited(name, val, err, *l, *u);
             } else {
-                m = m.add(name, val, err);
+                m = match self.limits.get(name) {
+                    Some((Some(l), Some(u))) => m.add_limited(name, val, err, *l, *u),
+                    Some((Some(l), None)) => m.add_lower_limited(name, val, err, *l),
+                    Some((None, Some(u))) => m.add_upper_limited(name, val, err, *u),
+                    _ => m.add(name, val, err),
+                };
             }
         }
         m
@@ -356,10 +1300,41 @@ impl Minuit {
             let err = *self.errors.get(name).unwrap_or(&0.1);
             if self.fixed.contains(name) {
                 m = m.add_const(name, val);
-            } else if let Some((l, u)) = self.limits.get(name) {
-                m = m.add_limited(name, val, err, *l, *u);
             } else {
-                m = m.add(name, val, err);
+                m = match self.limits.get(name) {
+                    Some((Some(l), Some(u))) => m.add_limited(name, val, err, *l, *u),
+                    Some((Some(l), None)) => m.add_lower_limited(name, val, err, *l),
+                    Some((None, Some(u))) => m.add_upper_limited(name, val, err, *u),
+                    _ => m.add(name, val, err),
+                };
+            }
+        }
+        m
+    }
+
+    fn build_migrad_with_const(&self, fixed_name: &str, fixed_val: f64) -> MnMigrad {
+        let mut m = MnMigrad::new()
+            .with_strategy(self.strategy)
+            .tolerance(self.tolerance);
+        if let Some(max) = self.max_calls {
+            m = m.max_fcn(max);
+        }
+        for name in &self.names {
+            if name == fixed_name {
+                m = m.add_const(name, fixed_val);
+            } else {
+                let val = *self.values.get(name).unwrap_or(&0.0);
+                let err = *self.errors.get(name).unwrap_or(&0.1);
+                if self.fixed.contains(name) {
+                    m = m.add_const(name, val);
+                } else {
+                    m = match self.limits.get(name) {
+                        Some((Some(l), Some(u))) => m.add_limited(name, val, err, *l, *u),
+                        Some((Some(l), None)) => m.add_lower_limited(name, val, err, *l),
+                        Some((None, Some(u))) => m.add_upper_limited(name, val, err, *u),
+                        _ => m.add(name, val, err),
+                    };
+                }
             }
         }
         m
@@ -385,6 +1360,13 @@ impl Minuit {
 #[pymodule]
 fn _minuit2(m: &Bound<'_, pyo3::types::PyModule>) -> PyResult<()> {
     m.add_class::<Minuit>()?;
-    m.add("__version__", "0.4.0")?;
+    m.add_class::<FMin>()?;
+    m.add_class::<Param>()?;
+    m.add_class::<MError>()?;
+    m.add_class::<ValueView>()?;
+    m.add_class::<ErrorView>()?;
+    m.add_class::<FixedView>()?;
+    m.add_class::<LimitView>()?;
+    m.add("__version__", env!("CARGO_PKG_VERSION"))?;
     Ok(())
 }

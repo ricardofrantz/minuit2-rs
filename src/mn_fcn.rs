@@ -1,8 +1,7 @@
 //! Call-counting FCN wrapper that operates in internal parameter space.
 //!
-//! Replaces MnFcn.h/.cxx + MnUserFcn.h/.cxx. Takes internal parameter
-//! vectors, transforms them to external space via MnUserTransformation,
-//! and calls the user's FCN. Counts every call.
+//! Takes internal parameter vectors, transforms them to external space via
+//! `MnUserTransformation`, calls the user's FCN, and counts every call.
 
 use std::cell::Cell;
 

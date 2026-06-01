@@ -1,8 +1,7 @@
 //! Migrad seed generator.
 //!
-//! Replaces MnSeedGenerator.cxx (Migrad path). Creates the initial MinimumSeed
-//! by evaluating the FCN, computing a numerical gradient (not just heuristic),
-//! and building V₀ = diag(1/g2_i).
+//! Creates the initial `MinimumSeed` by evaluating the FCN, computing a
+//! numerical gradient, and building `V0 = diag(1/g2_i)`.
 
 use nalgebra::{DMatrix, DVector};
 
@@ -10,7 +9,9 @@ use crate::fcn::FCNGradient;
 use crate::gradient::{
     AnalyticalGradientCalculator, InitialGradientCalculator, Numerical2PGradientCalculator,
 };
+use crate::linesearch::mn_linesearch;
 use crate::minimum::error::MinimumError;
+use crate::minimum::gradient::FunctionGradient;
 use crate::minimum::parameters::MinimumParameters;
 use crate::minimum::seed::MinimumSeed;
 use crate::minimum::state::MinimumState;
@@ -45,6 +46,14 @@ impl MigradSeedGenerator {
         // 4. Compute numerical gradient (2-point central differences)
         let numerical_calc = Numerical2PGradientCalculator::new(*strategy);
         let gradient = numerical_calc.compute(fcn, &params, trafo, &heuristic_grad);
+
+        // Escape from bound-singular points where g2 <= 0 (internal Jacobian = 0).
+        // Only triggers when some g2[i] <= 0; is a complete no-op otherwise.
+        let (params, gradient) = if gradient.g2().iter().any(|&g2| g2 <= 0.0) {
+            escape_negative_curvature(fcn, params, gradient, trafo, strategy)
+        } else {
+            (params, gradient)
+        };
 
         // 5. Build V₀ = diag(1/g2_i), fallback to 1.0 for non-positive g2
         let mut v0 = DMatrix::zeros(n, n);
@@ -119,4 +128,52 @@ impl MigradSeedGenerator {
     ) -> MinimumSeed {
         Self::generate_with_gradient(fcn, trafo, strategy)
     }
+}
+
+fn escape_negative_curvature(
+    fcn: &MnFcn,
+    mut params: MinimumParameters,
+    mut gradient: FunctionGradient,
+    trafo: &MnUserTransformation,
+    strategy: &MnStrategy,
+) -> (MinimumParameters, FunctionGradient) {
+    let n = gradient.g2().len();
+    let max_iters = 2 * n + 2;
+
+    for _ in 0..max_iters {
+        if !gradient.g2().iter().any(|&g2| g2 <= 0.0) {
+            break;
+        }
+
+        let step_floor = trafo.precision().eps2().sqrt();
+        let mut step = DVector::zeros(n);
+        for i in 0..n {
+            if gradient.g2()[i] <= 0.0 {
+                let gi = gradient.grad()[i];
+                let gstepi = gradient.gstep()[i].abs().max(step_floor);
+                // Move opposite to gradient to descend; for gi==0, probe in positive direction.
+                step[i] = if gi > 0.0 { -gstepi } else { gstepi };
+            }
+        }
+
+        if step.iter().all(|&s| s == 0.0) {
+            break;
+        }
+
+        let gdel = step.dot(gradient.grad());
+        let ls = mn_linesearch(fcn, &params, &step, gdel, trafo.precision());
+
+        if ls.x == 0.0 {
+            break;
+        }
+
+        let new_vec = params.vec() + ls.x * &step;
+        let actual_step = ls.x * &step;
+        params = MinimumParameters::with_step(new_vec, actual_step, ls.y);
+
+        let new_calc = Numerical2PGradientCalculator::new(*strategy);
+        gradient = new_calc.compute(fcn, &params, trafo, &gradient);
+    }
+
+    (params, gradient)
 }

@@ -1,7 +1,7 @@
 //! VariableMetricMinimizer: composes seed generator + builder.
 //!
-//! Replaces VariableMetricMinimizer.h. Orchestrates the Migrad minimization
-//! by generating the seed, then running the VariableMetricBuilder loop.
+//! Orchestrates the Migrad minimization by generating the seed, then running
+//! the `VariableMetricBuilder` loop.
 
 use super::builder::VariableMetricBuilder;
 use super::seed::MigradSeedGenerator;

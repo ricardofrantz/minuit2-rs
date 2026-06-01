@@ -1,8 +1,8 @@
 //! Initial gradient calculator from parameter step sizes.
 //!
-//! Replaces InitialGradientCalculator.cxx. Does NOT evaluate the FCN --- it
-//! produces a rough heuristic gradient estimate from the user-provided
-//! parameter errors and the error definition (Up value).
+//! Produces a rough heuristic gradient estimate from the user-provided
+//! parameter errors and the error definition (`Up` value). It does not evaluate
+//! the FCN.
 //!
 //! The key formula: g2 = 2 * error_def / dirin^2, grad = g2 * dirin,
 //! where dirin is the internal-space step derived from the external error.

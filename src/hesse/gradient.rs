@@ -1,9 +1,7 @@
 //! Hessian-based gradient refinement.
 //!
-//! Replaces HessianGradientCalculator.cxx. Refines the gradient using second
-//! derivative information from the Hessian diagonal. More accurate step sizes
-//! than the standard Numerical2PGradientCalculator because it uses g2 from
-//! the Hessian computation.
+//! Refines the gradient using second-derivative information from the Hessian
+//! diagonal. The step sizes use `g2` from the Hessian computation.
 
 use nalgebra::DVector;
 

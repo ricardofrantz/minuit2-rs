@@ -1,7 +1,6 @@
 /// Machine precision constants for numerical differentiation.
 ///
-/// Replaces the C++ `MnMachinePrecision` class and `MnTiny` volatile trick.
-/// In Rust we simply use `f64::EPSILON` (2^-52 ≈ 2.22e-16).
+/// Uses `f64::EPSILON` (2^-52 ≈ 2.22e-16) as the machine epsilon basis.
 #[derive(Debug, Clone, Copy)]
 pub struct MnMachinePrecision {
     eps: f64,

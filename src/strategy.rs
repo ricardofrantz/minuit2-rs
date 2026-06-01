@@ -1,7 +1,7 @@
 /// Strategy presets controlling gradient/Hessian calculation effort.
 ///
-/// Three levels matching the C++ `MnStrategy`: low (0), medium (1), high (2).
-/// Medium is the default. Constants match MnStrategy.cxx exactly.
+/// Three Minuit-style effort levels: low (0), medium (1), high (2).
+/// Medium is the default.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MnStrategy {
     strategy: u32,

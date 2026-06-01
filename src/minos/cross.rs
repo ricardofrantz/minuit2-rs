@@ -1,7 +1,7 @@
 //! MnCross: result of a single crossing-point search.
 //!
-//! Replaces MnCross.h. Contains the crossing multiplier, user parameter state,
-//! number of function calls, and status flags.
+//! Contains the crossing multiplier, user parameter state, number of function
+//! calls, and status flags.
 
 use crate::user_parameter_state::MnUserParameterState;
 

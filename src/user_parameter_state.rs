@@ -1,8 +1,7 @@
 //! Complete parameter state: parameters + function value + EDM + nfcn + covariance.
 //!
-//! Replaces MnUserParameterState.h/.cxx. This is the state object returned to
-//! the user after minimization, containing fitted values, errors, and
-//! optionally the covariance matrix.
+//! State object returned to the user after minimization, containing fitted
+//! values, errors, and optionally the covariance matrix.
 
 use crate::parameter::MinuitParameter;
 use crate::user_covariance::MnUserCovariance;

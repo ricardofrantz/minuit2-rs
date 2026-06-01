@@ -1,6 +1,6 @@
 //! Display implementations for minimization results.
 //!
-//! Replaces MnPrint.h/.cxx. Uses Rust's `Display` trait.
+//! Uses Rust's `Display` trait.
 
 use std::fmt;
 

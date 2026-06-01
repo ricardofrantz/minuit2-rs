@@ -1,7 +1,7 @@
 //! Force a symmetric matrix to be positive-definite.
 //!
-//! Replaces MnPosDef.cxx. Uses eigendecomposition to detect and correct
-//! non-positive-definite error matrices by shifting eigenvalues.
+//! Uses eigendecomposition to detect and correct non-positive-definite error
+//! matrices by shifting eigenvalues.
 
 use crate::precision::MnMachinePrecision;
 use nalgebra::DMatrix;

@@ -1,8 +1,7 @@
 //! Simplex seed generator.
 //!
-//! Replaces SimplexSeedGenerator.cxx. Creates the initial MinimumSeed for
-//! the Simplex minimizer by evaluating the FCN at the starting point and
-//! computing an initial gradient estimate.
+//! Creates the initial `MinimumSeed` for the Simplex minimizer by evaluating
+//! the FCN at the starting point and computing an initial gradient estimate.
 
 use nalgebra::DVector;
 

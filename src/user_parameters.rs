@@ -1,8 +1,7 @@
 //! High-level parameter collection with name-based lookup.
 //!
-//! Replaces MnUserParameters.h/.cxx. Delegates to `MnUserTransformation` for
-//! the actual index mapping and transforms. Provides the user-facing API for
-//! adding, fixing, releasing, and bounding parameters.
+//! Delegates index mapping and transforms to `MnUserTransformation`. Provides
+//! the user-facing API for adding, fixing, releasing, and bounding parameters.
 
 use std::collections::HashMap;
 
