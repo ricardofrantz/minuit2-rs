@@ -121,9 +121,9 @@ jobs:
           if-no-files-found: error
 
   commit-refresh:
-    name: Commit refreshed artifacts (master only)
+    name: Commit refreshed artifacts (main only)
     needs: benchmark
-    if: ${{ github.ref == 'refs/heads/master' }}
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
