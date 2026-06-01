@@ -9,7 +9,7 @@ Outputs:
   - reports/parity/needs_review.csv
 
 Method:
-  1. Parse Port entries from INVENTORY.md
+  1. Parse in-scope entries from INVENTORY.md
   2. Fetch upstream files from a pinned Minuit2 commit
   3. Extract upstream function-like symbols (heuristic parser)
   4. Extract Rust symbols from src/ (excluding cfg(test) blocks)
@@ -39,6 +39,7 @@ CACHE_DIR = REPO_ROOT / ".cache" / "parity"
 DEFAULT_UPSTREAM_REPO = "root-project/root"
 DEFAULT_UPSTREAM_SUBDIR = "math/minuit2"
 DEFAULT_UPSTREAM_TAG = "v6-36-08"
+IN_SCOPE_INVENTORY_ACTIONS = {"implement", "port"}
 
 
 CPP_KEYWORDS = {
@@ -243,15 +244,29 @@ def parse_inventory_port_files() -> list[UpstreamFile]:
     text = INVENTORY_PATH.read_text()
     files: list[UpstreamFile] = []
     for line in text.splitlines():
-        if "| Port" not in line:
+        if not line.lstrip().startswith("|"):
             continue
-        m = re.search(r"\[([^\]]+)\]", line)
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) < 2:
+            continue
+        if cells[0].lower() in {"file", "------", "---"}:
+            continue
+
+        action = cells[1].strip("*` ").lower()
+        # Older inventories used a `Port` action; the current inventory uses
+        # `Implement` for files that remain in the symbol parity matrix.
+        # `Replace` rows document nalgebra substitutions and are tracked in
+        # report prose rather than as ROOT symbol-surface rows.
+        if action not in IN_SCOPE_INVENTORY_ACTIONS:
+            continue
+
+        m = re.search(r"\[([^\]]+)\]", cells[0])
         if not m:
             continue
         rel = m.group(1).strip()
         if not (rel.startswith("inc/") or rel.startswith("src/")):
             continue
-        basename = re.sub(r"\.(h|hpp|cxx)$", "", rel.split("/")[-1])
+        basename = re.sub(r"\.(h|hpp|cxx|cpp|cc)$", "", rel.split("/")[-1])
         files.append(UpstreamFile(path=rel, basename=basename))
     # keep insertion order, drop exact duplicates
     unique: dict[tuple[str, str], UpstreamFile] = {}
@@ -534,6 +549,12 @@ def main() -> int:
     commit = resolve_git_ref(repo_slug, ref)
     subdir = args.subdir.strip("/")
     upstream_files = parse_inventory_port_files()
+    if not upstream_files:
+        raise RuntimeError(
+            f"no in-scope upstream files found in {INVENTORY_PATH.relative_to(REPO_ROOT)}; "
+            "expected markdown rows with Implement or Port actions"
+        )
+
     file_groups: dict[str, list[UpstreamFile]] = defaultdict(list)
     for f in upstream_files:
         file_groups[f.basename].append(f)
@@ -542,6 +563,7 @@ def main() -> int:
     _, rust_by_file, rust_by_norm = extract_rust_symbols()
 
     rows: list[dict[str, str]] = []
+    extracted_symbol_count = 0
 
     for basename in sorted(file_groups):
         # Candidate Rust files from manual map + doc comments.
@@ -573,6 +595,8 @@ def main() -> int:
                     extracted[key] = (sym, uf.path)
                 elif new_is_src == old_is_src and sym.line < old_sym.line:
                     extracted[key] = (sym, uf.path)
+
+        extracted_symbol_count += len(extracted)
 
         if not extracted:
             rows.append(
@@ -685,12 +709,18 @@ def main() -> int:
                 }
             )
 
+    if not rows:
+        raise RuntimeError("parity report produced zero rows; refusing to overwrite report artifacts")
+    if extracted_symbol_count == 0:
+        raise RuntimeError("extracted zero upstream symbols; refusing to overwrite report artifacts")
+
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
     csv_path = REPORT_DIR / "functions.csv"
     with csv_path.open("w", newline="") as f:
         writer = csv.DictWriter(
             f,
+            lineterminator="\n",
             fieldnames=[
                 "upstream_repo",
                 "upstream_subdir",
@@ -713,6 +743,7 @@ def main() -> int:
     with missing_csv.open("w", newline="") as f:
         writer = csv.DictWriter(
             f,
+            lineterminator="\n",
             fieldnames=[
                 "upstream_repo",
                 "upstream_subdir",
@@ -737,6 +768,7 @@ def main() -> int:
     with review_csv.open("w", newline="") as f:
         writer = csv.DictWriter(
             f,
+            lineterminator="\n",
             fieldnames=[
                 "upstream_repo",
                 "upstream_subdir",

@@ -243,6 +243,7 @@ def main() -> int:
     with csv_path.open("w", newline="") as f:
         writer = csv.DictWriter(
             f,
+            lineterminator="\n",
             fieldnames=[
                 "workload",
                 "status",
