@@ -376,12 +376,19 @@ impl ValueView {
     }
     fn __iter__(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let m = self.owner.borrow(py);
-        let vals: Vec<f64> = m.names.iter().map(|n| *m.values.get(n).unwrap_or(&0.0)).collect();
+        let vals: Vec<f64> = m
+            .names
+            .iter()
+            .map(|n| *m.values.get(n).unwrap_or(&0.0))
+            .collect();
         list_iter(PyList::new(py, vals)?)
     }
     fn to_dict(&self, py: Python<'_>) -> HashMap<String, f64> {
         let m = self.owner.borrow(py);
-        m.names.iter().map(|n| (n.clone(), *m.values.get(n).unwrap_or(&0.0))).collect()
+        m.names
+            .iter()
+            .map(|n| (n.clone(), *m.values.get(n).unwrap_or(&0.0)))
+            .collect()
     }
     fn __repr__(&self, py: Python<'_>) -> String {
         format!("<ValueView {:?}>", self.to_dict(py))
@@ -411,12 +418,19 @@ impl ErrorView {
     }
     fn __iter__(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let m = self.owner.borrow(py);
-        let vals: Vec<f64> = m.names.iter().map(|n| *m.errors.get(n).unwrap_or(&0.1)).collect();
+        let vals: Vec<f64> = m
+            .names
+            .iter()
+            .map(|n| *m.errors.get(n).unwrap_or(&0.1))
+            .collect();
         list_iter(PyList::new(py, vals)?)
     }
     fn to_dict(&self, py: Python<'_>) -> HashMap<String, f64> {
         let m = self.owner.borrow(py);
-        m.names.iter().map(|n| (n.clone(), *m.errors.get(n).unwrap_or(&0.1))).collect()
+        m.names
+            .iter()
+            .map(|n| (n.clone(), *m.errors.get(n).unwrap_or(&0.1)))
+            .collect()
     }
     fn __repr__(&self, py: Python<'_>) -> String {
         format!("<ErrorView {:?}>", self.to_dict(py))
@@ -455,7 +469,10 @@ impl FixedView {
     }
     fn to_dict(&self, py: Python<'_>) -> HashMap<String, bool> {
         let m = self.owner.borrow(py);
-        m.names.iter().map(|n| (n.clone(), m.fixed.contains(n))).collect()
+        m.names
+            .iter()
+            .map(|n| (n.clone(), m.fixed.contains(n)))
+            .collect()
     }
     fn __repr__(&self, py: Python<'_>) -> String {
         format!("<FixedView {:?}>", self.to_dict(py))
@@ -470,10 +487,7 @@ struct LimitView {
 impl LimitView {
     fn pair(m: &Minuit, name: &str) -> (f64, f64) {
         match m.limits.get(name) {
-            Some((lo, hi)) => (
-                lo.unwrap_or(f64::NEG_INFINITY),
-                hi.unwrap_or(f64::INFINITY),
-            ),
+            Some((lo, hi)) => (lo.unwrap_or(f64::NEG_INFINITY), hi.unwrap_or(f64::INFINITY)),
             None => (f64::NEG_INFINITY, f64::INFINITY),
         }
     }
@@ -486,7 +500,12 @@ impl LimitView {
         let name = resolve_param_name(&m.names, &key)?;
         Ok(Self::pair(&m, &name))
     }
-    fn __setitem__(&self, py: Python<'_>, key: Bound<'_, PyAny>, value: Bound<'_, PyAny>) -> PyResult<()> {
+    fn __setitem__(
+        &self,
+        py: Python<'_>,
+        key: Bound<'_, PyAny>,
+        value: Bound<'_, PyAny>,
+    ) -> PyResult<()> {
         let (lo, hi) = if value.is_none() {
             (None, None)
         } else {
@@ -512,7 +531,10 @@ impl LimitView {
     }
     fn to_dict(&self, py: Python<'_>) -> HashMap<String, (f64, f64)> {
         let m = self.owner.borrow(py);
-        m.names.iter().map(|n| (n.clone(), Self::pair(&m, n))).collect()
+        m.names
+            .iter()
+            .map(|n| (n.clone(), Self::pair(&m, n)))
+            .collect()
     }
     fn __repr__(&self, py: Python<'_>) -> String {
         format!("<LimitView {:?}>", self.to_dict(py))
@@ -678,7 +700,9 @@ impl Minuit {
 
     #[getter]
     fn get_values(slf: Bound<'_, Self>) -> ValueView {
-        ValueView { owner: slf.unbind() }
+        ValueView {
+            owner: slf.unbind(),
+        }
     }
 
     #[setter]
@@ -692,7 +716,9 @@ impl Minuit {
 
     #[getter]
     fn get_errors(slf: Bound<'_, Self>) -> ErrorView {
-        ErrorView { owner: slf.unbind() }
+        ErrorView {
+            owner: slf.unbind(),
+        }
     }
 
     #[setter]
@@ -706,7 +732,9 @@ impl Minuit {
 
     #[getter]
     fn get_limits(slf: Bound<'_, Self>) -> LimitView {
-        LimitView { owner: slf.unbind() }
+        LimitView {
+            owner: slf.unbind(),
+        }
     }
 
     #[setter]
@@ -735,7 +763,9 @@ impl Minuit {
 
     #[getter]
     fn get_fixed(slf: Bound<'_, Self>) -> FixedView {
-        FixedView { owner: slf.unbind() }
+        FixedView {
+            owner: slf.unbind(),
+        }
     }
 
     #[setter]
@@ -874,7 +904,9 @@ impl Minuit {
         let name: String = if let Ok(idx) = key.extract::<usize>() {
             slf.names
                 .get(idx)
-                .ok_or_else(|| PyValueError::new_err(format!("parameter index {} out of range", idx)))?
+                .ok_or_else(|| {
+                    PyValueError::new_err(format!("parameter index {} out of range", idx))
+                })?
                 .clone()
         } else {
             let s = key.extract::<String>()?;

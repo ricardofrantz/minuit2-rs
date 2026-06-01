@@ -2,7 +2,7 @@
 //!
 //! Takes gradients computed by the user (in external parameter space) and
 //! transforms them to internal parameter space using the chain rule:
-//!   g_int[i] = g_ext[i] * dext/dint[i]
+//!   `g_int[i] = g_ext[i] * dext/dint[i]`
 //!
 //! Also computes g2 (second derivative heuristic) and gstep (step sizes) using
 //! the same logic as InitialGradientCalculator.

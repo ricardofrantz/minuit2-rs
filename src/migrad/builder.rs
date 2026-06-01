@@ -22,7 +22,7 @@ pub struct VariableMetricBuilder;
 impl VariableMetricBuilder {
     /// Top-level Migrad minimization: run iterations, optionally re-seed on failure.
     ///
-    /// Returns the iteration history as a Vec<MinimumState>.
+    /// Returns the iteration history as a `Vec<MinimumState>`.
     pub fn minimum(
         fcn: &MnFcn,
         seed: &MinimumSeed,
