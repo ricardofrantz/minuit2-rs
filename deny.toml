@@ -34,6 +34,8 @@ allow = [
   "BSD-3-Clause",
   "CC0-1.0",
   "ISC",
+  # This crate itself is LGPL-2.1-or-later (matching upstream ROOT Minuit2).
+  "LGPL-2.1-or-later",
   "MIT",
   "MPL-2.0",
   "Unicode-3.0",

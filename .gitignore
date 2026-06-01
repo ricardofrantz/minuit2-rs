@@ -6,3 +6,12 @@ __pycache__/
 *.pyc
 *.profraw
 *.profdata
+
+# bv (beads viewer) local config and caches
+.bv/
+
+# Local AI/editor tool config
+.antigravitycli/
+
+# Local maturin/PyO3 build outputs
+python/minuit2/*.so
