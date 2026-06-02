@@ -37,7 +37,9 @@ Pure Rust implementation of Minuit-style parameter optimization algorithms, test
 - [Architecture: Differences from C++ Minuit2](#architecture-differences-from-c-minuit2)
 - [Migration from iminuit (Python)](#migration-from-iminuit-python)
 - [Benchmark Results](#benchmark-results)
+- [Pure Rust vs C++ Minuit2](#pure-rust-vs-c-minuit2)
 - [Status](#status)
+- [Testing](#testing)
 - [Verification (ROOT Parity)](#verification-root-parity)
 - [Provenance and Licensing](#provenance-and-licensing)
 - [License](#license)
@@ -844,7 +846,58 @@ Representative performance on standard test functions (strategy 1, default toler
 | Goldstein-Price | Simplex | 2 | ~90 | Yes | Multiple local minima |
 | Gaussian fit | Migrad + Hesse | 3 | ~60 | Yes | Chi-square with bounds |
 
-Run benchmarks: `cargo bench`
+Run benchmarks: `cargo bench`. (These are illustrative Rust-only counts on
+easy/standard setups; for the rigorous, apples-to-apples comparison against the
+C++ original see [Pure Rust vs C++ Minuit2](#pure-rust-vs-c-minuit2) below — its
+Rosenbrock workload uses a harder start and reports a higher NFCN.)
+
+---
+
+## Pure Rust vs C++ Minuit2
+
+This is a from-scratch Rust reimplementation, not a binding — so the honest
+question is what you trade by leaving the C++/Fortran original behind. No
+sugar-coating:
+
+**Function evaluations (NFCN), head-to-head on identical workloads** (from the
+ROOT `v6-36-08` differential harness — the only apples-to-apples measurement):
+
+| Workload | C++ (ROOT) | Rust | Δ |
+|----------|-----------:|-----:|---|
+| Rosenbrock — Migrad | 140 | 199 | **+42% (Rust uses more)** |
+| Rosenbrock — Migrad, strategy 2 | 162 | 199 | +23% |
+| Quadratic, lower-limited — Migrad | 45 | 49 | +9% |
+| Simplex | 19 | 19 | 0% |
+| Minos (p0) | 38 | 19 | −50% (Rust uses fewer) |
+| Quadratic (fixed param) — Hesse | 39 | 19 | fewer |
+| Quadratic (fixed param) — Migrad | 29 | 5 | fewer |
+
+It is **mixed, not uniformly slower**: on the hard curved valley (Rosenbrock) the
+Rust DFP path currently spends ~40% more function evaluations than C++; on
+several other workloads it spends fewer or the same. These deltas come from small
+convergence-path differences, not a different algorithm.
+
+**Wall-clock vs C++ is not benchmarked here.** Both are native compiled code doing
+the same arithmetic, so per-call cost is comparable — but a fair, same-harness
+timing comparison has not been done, so no wall-clock speed claim is made.
+
+### What you gain by going pure Rust
+- **No C++/Fortran/GSL/ROOT dependency** — `cargo add minuit2` builds anywhere; no
+  multi-hundred-MB ROOT install, no linker/toolchain friction.
+- **Memory safety** — no segfaults or undefined behaviour.
+- **Easy integration** into Rust (and, via PyO3, Python) codebases; cross-platform,
+  WASM-capable.
+- **Drop-in `iminuit`-compatible Python API.**
+
+### What you give up / pay
+- **Sometimes more function evaluations** on hard problems (Rosenbrock +42% above).
+- **Less battle-tested robustness** on a few ill-conditioned problems — see
+  [Testing](#testing): 4 NIST StRD datasets are not yet solved out of the box.
+- **No rigorous wall-clock benchmark vs C++** yet.
+
+**Bottom line:** algorithmically equivalent and numerically validated against ROOT,
+occasionally less call-efficient on hard problems, in exchange for a
+dependency-free, memory-safe, easy-to-embed pure-Rust library.
 
 ---
 
@@ -863,6 +916,28 @@ Run benchmarks: `cargo bench`
 | **Python Bindings** | Done | PyO3 v0.28 with a measured `iminuit.Minuit`-compatible subset |
 | **Global Correlations** | Done | Global correlation coefficients from covariance |
 | **Covariance Squeeze** | Done | Remove parameter from covariance matrix |
+
+---
+
+## Testing
+
+`minuit2` is validated by a layered suite (**148 tests** across 17 integration
+files plus unit and doc tests — `cargo test --all-features`):
+
+- **Unit + integration tests** — minimizer behaviour, error analysis, scans,
+  contours, bounded/fixed parameters, and NaN/panic robustness.
+- **NIST StRD certified-oracle tests** (`tests/nist_strd_certified.rs`) — fit 8
+  official NIST Statistical Reference Datasets (Misra1a, Misra1b, Chwirut2,
+  Rat42, Kirby2, Thurber, Gauss1, ENSO) from the NIST "Start 2" values and
+  assert convergence to the **NIST-certified** parameter values.
+- **Property-based metamorphic tests** (`tests/proptest_metamorphic.rs`) —
+  randomized translation / scaling / permutation / start-point invariances via
+  `proptest`; oracle-free, over many sampled inputs.
+- **ROOT differential parity** — 12 workloads compared numerically against ROOT
+  Minuit2 `v6-36-08` (see below).
+- **iminuit drop-in harness** (`python/compat/diff_iminuit.py`) — 27 checks run
+  identical user code against `iminuit.Minuit` and `minuit2.Minuit` and compare
+  the results numerically.
 
 ---
 
