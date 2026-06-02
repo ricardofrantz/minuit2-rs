@@ -28,8 +28,9 @@ pub fn mn_linesearch(
 
     let start_value = params.fval();
     let start = params.vec();
+    let mut scratch = start.clone();
 
-    let unit_value = evaluate_step(fcn, start, step, 1.0);
+    let unit_value = evaluate_step(fcn, start, step, 1.0, &mut scratch);
 
     let mut best_lambda = 0.0;
     let mut best_value = start_value;
@@ -53,7 +54,7 @@ pub fn mn_linesearch(
         return MnParabolaPoint::new(best_lambda, best_value);
     }
 
-    let trial_value = evaluate_step(fcn, start, step, trial_lambda);
+    let trial_value = evaluate_step(fcn, start, step, trial_lambda, &mut scratch);
 
     if trial_value < best_value {
         best_lambda = trial_lambda;
@@ -95,7 +96,7 @@ pub fn mn_linesearch(
             break;
         }
 
-        let trial_value = evaluate_step(fcn, start, step, trial_lambda);
+        let trial_value = evaluate_step(fcn, start, step, trial_lambda, &mut scratch);
 
         if trial_value < best_value {
             best_lambda = trial_lambda;
@@ -113,9 +114,16 @@ pub fn mn_linesearch(
     MnParabolaPoint::new(best_lambda, best_value)
 }
 
-fn evaluate_step(fcn: &MnFcn, start: &DVector<f64>, direction: &DVector<f64>, lambda: f64) -> f64 {
-    let candidate = start + lambda * direction;
-    fcn.call(candidate.as_slice())
+fn evaluate_step(
+    fcn: &MnFcn,
+    start: &DVector<f64>,
+    direction: &DVector<f64>,
+    lambda: f64,
+    scratch: &mut DVector<f64>,
+) -> f64 {
+    scratch.copy_from(start);
+    scratch.axpy(lambda, direction, 1.0);
+    fcn.call(scratch.as_slice())
 }
 
 fn sorted_points(mut points: [MnParabolaPoint; 3]) -> [MnParabolaPoint; 3] {

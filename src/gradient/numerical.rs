@@ -45,6 +45,8 @@ impl Numerical2PGradientCalculator {
         let mut grad = DVector::zeros(n);
         let mut g2 = DVector::zeros(n);
         let mut gstep = DVector::zeros(n);
+        let mut xp = x.clone();
+        let mut xm = x.clone();
 
         for i in 0..n {
             let ext_idx = trafo.ext_of_int(i);
@@ -78,13 +80,13 @@ impl Numerical2PGradientCalculator {
                 gstepi = step;
 
                 // Central differences: f(x+h) - f(x-h)
-                let mut xp = x.clone();
-                let mut xm = x.clone();
                 xp[i] = xi + step;
                 xm[i] = xi - step;
 
                 let fp = fcn.call(xp.as_slice());
                 let fm = fcn.call(xm.as_slice());
+                xp[i] = xi;
+                xm[i] = xi;
 
                 let grdi = 0.5 * (fp - fm) / step;
                 let g2i_new = (fp + fm - 2.0 * fcnmin) / (step * step);
@@ -136,6 +138,8 @@ impl Numerical2PGradientCalculator {
         let mut grad = DVector::zeros(n);
         let mut g2 = DVector::zeros(n);
         let mut gstep = DVector::zeros(n);
+        let mut xp = x.clone();
+        let mut xm = x.clone();
 
         for i in 0..n {
             let ext_idx = trafo.ext_of_int(i);
@@ -164,13 +168,13 @@ impl Numerical2PGradientCalculator {
 
                 gstepi = step;
 
-                let mut xp = x.clone();
-                let mut xm = x.clone();
                 xp[i] = xi + step;
                 xm[i] = xi - step;
 
                 let fp = fcn.call(xp.as_slice());
                 let fm = fcn.call(xm.as_slice());
+                xp[i] = xi;
+                xm[i] = xi;
 
                 let grdi = 0.5 * (fp - fm) / step;
                 let g2i_new = (fp + fm - 2.0 * fcnmin) / (step * step);

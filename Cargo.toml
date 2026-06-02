@@ -48,6 +48,10 @@ proptest = "1.11"
 parallel = ["rayon"]
 python = ["pyo3", "numpy"]
 
+[profile.release]
+lto = true
+codegen-units = 1
+
 [[bench]]
 name = "benchmarks"
 harness = false
