@@ -881,6 +881,12 @@ convergence-path differences, not a different algorithm.
 the same arithmetic, so per-call cost is comparable — but a fair, same-harness
 timing comparison has not been done, so no wall-clock speed claim is made.
 
+Within this crate, `0.5.1` made the hot paths (2-point gradient, line search)
+allocation-light by reusing preallocated scratch buffers — a **bit-identical**
+optimization (no numerical result changed) measured at ~13–29% faster than
+`0.5.0` on this crate's own bench suite. See the [CHANGELOG](CHANGELOG.md); it
+does not affect the function-evaluation comparison above.
+
 ### What you gain by going pure Rust
 - **No C++/Fortran/GSL/ROOT dependency** — `cargo add minuit2` builds anywhere; no
   multi-hundred-MB ROOT install, no linker/toolchain friction.
