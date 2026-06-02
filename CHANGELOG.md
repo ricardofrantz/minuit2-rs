@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.1] - 2026-06-02
+
+### Performance
+
+- Reduced allocation churn in the hot minimizer paths, with **bit-identical**
+  numerical results (NFCN, fval, parameters, and covariance unchanged — verified
+  by byte-identical regeneration of the ROOT differential outputs):
+  - `Numerical2PGradientCalculator` reuses two scratch vectors across the
+    2-point central-difference loop instead of cloning the parameter vector on
+    every function evaluation.
+  - `mn_linesearch` reuses one scratch vector (`copy_from` + `axpy`) instead of
+    allocating on each of its up-to-14 step evaluations.
+
+  These source-level changes benefit all downstream builds. Criterion on this
+  crate's bench suite shows ~13–29% wall-clock improvement (Rosenbrock Migrad
+  -15%, Migrad+Hesse -16%, Minos -16%, Scan serial -29%).
+- Enabled `lto = true` + `codegen-units = 1` for this crate's own `release`
+  builds (benches/examples). No effect on numerical output.
+
+### Added
+
+- NIST StRD certified-oracle tests: 8 datasets (Misra1a/b, Chwirut2, Rat42,
+  Kirby2, Thurber, Gauss1, ENSO) fit to the NIST-certified parameter values.
+- Property-based metamorphic tests (`proptest`): translation, scaling,
+  permutation, and start-point invariances over randomized inputs.
+- Expanded the `iminuit` differential drop-in harness from 20 to 27 checks.
+- README: an honest "Pure Rust vs C++ Minuit2" comparison (head-to-head
+  function-evaluation counts from the ROOT harness) and a Testing section.
+
+### Fixed
+
+- macOS CI: `cargo test --all-features` now links correctly when the pyo3
+  `extension-module` + `abi3` features are enabled (added `-undefined
+  dynamic_lookup` via `.cargo/config.toml`). Dev/CI only; the published library
+  is unaffected.
+
 ## [0.5.0] - 2026-06-01
 
 ### Added
@@ -214,7 +250,8 @@ changes; the Rust library surface is identical to 0.4.1.
 - `MnStrategy` (low/medium/high optimization presets)
 - `nalgebra` for all linear algebra
 
-[Unreleased]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/ricardofrantz/minuit2-rs/compare/v0.4.0...v0.4.1
