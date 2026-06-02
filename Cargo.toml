@@ -42,6 +42,7 @@ numpy = { version = "0.28", optional = true }
 
 [dev-dependencies]
 criterion = "0.5"
+proptest = "1.11"
 
 [features]
 parallel = ["rayon"]

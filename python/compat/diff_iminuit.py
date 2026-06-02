@@ -157,6 +157,48 @@ def c_fixto(M):
     return [m.values["b"]]  # fixed to 3.0
 
 
+def c_values_iteration(M):
+    m = _fit(M)
+    return list(m.values)  # iterating a ValueView yields the values in order
+
+
+def c_values_to_dict(M):
+    m = _fit(M)
+    d = m.values.to_dict()
+    return [d["a"], d["b"]]
+
+
+def c_errors_by_index(M):
+    m = _fit(M)
+    return [m.errors[0], m.errors[1]]
+
+
+def c_negative_index(M):
+    m = _fit(M)
+    return [m.values[-1]]  # -1 -> last parameter (b)
+
+
+def c_default_errordef(M):
+    m = M(cost, a=0.0, b=0.0)
+    return [m.errordef]  # iminuit defaults to 1.0 (least-squares)
+
+
+def c_multi_param_minos(M):
+    m = _fit(M)
+    m.minos()
+    ea, eb = m.merrors["a"], m.merrors["b"]
+    return [ea.lower, ea.upper, eb.lower, eb.upper]
+
+
+def c_fix_release_roundtrip(M):
+    m = M(cost, a=0.0, b=5.0)
+    m.fixed["b"] = True
+    m.migrad()  # b held at 5.0
+    m.fixed["b"] = False
+    m.migrad()  # b now free -> 2.0
+    return [m.values["a"], m.values["b"]]
+
+
 CHECKS = [
     ("construct_kwargs", c_construct_kwargs),
     ("construct_positional", c_construct_positional),
@@ -178,6 +220,13 @@ CHECKS = [
     ("contour_grid", c_contour_grid),
     ("reset", c_reset),
     ("fixto", c_fixto),
+    ("values_iteration", c_values_iteration),
+    ("values_to_dict", c_values_to_dict),
+    ("errors_by_index", c_errors_by_index),
+    ("negative_index", c_negative_index),
+    ("default_errordef", c_default_errordef),
+    ("multi_param_minos", c_multi_param_minos),
+    ("fix_release_roundtrip", c_fix_release_roundtrip),
 ]
 
 

@@ -39,6 +39,16 @@ PATHS=(
   "nist/Misra1a.dat"
   "nist/Hahn1.dat"
   "nist/Rat43.dat"
+  "nist/Misra1b.dat"
+  "nist/Chwirut2.dat"
+  "nist/Lanczos3.dat"
+  "nist/Gauss1.dat"
+  "nist/Kirby2.dat"
+  "nist/Thurber.dat"
+  "nist/Rat42.dat"
+  "nist/MGH09.dat"
+  "nist/BoxBOD.dat"
+  "nist/ENSO.dat"
   "usgs/earthquakes_2025_m4p5.csv"
   "cern/MuRun2010B_0.csv"
   "cern/Zmumu.csv"
@@ -54,6 +64,26 @@ url_for() {
       printf '%s\n' "https://www.itl.nist.gov/div898/strd/nls/data/LINKS/DATA/Hahn1.dat" ;;
     nist/Rat43.dat)
       printf '%s\n' "https://www.itl.nist.gov/div898/strd/nls/data/LINKS/DATA/Rat43.dat" ;;
+    nist/Misra1b.dat)
+      printf '%s\n' "https://www.itl.nist.gov/div898/strd/nls/data/LINKS/DATA/Misra1b.dat" ;;
+    nist/Chwirut2.dat)
+      printf '%s\n' "https://www.itl.nist.gov/div898/strd/nls/data/LINKS/DATA/Chwirut2.dat" ;;
+    nist/Lanczos3.dat)
+      printf '%s\n' "https://www.itl.nist.gov/div898/strd/nls/data/LINKS/DATA/Lanczos3.dat" ;;
+    nist/Gauss1.dat)
+      printf '%s\n' "https://www.itl.nist.gov/div898/strd/nls/data/LINKS/DATA/Gauss1.dat" ;;
+    nist/Kirby2.dat)
+      printf '%s\n' "https://www.itl.nist.gov/div898/strd/nls/data/LINKS/DATA/Kirby2.dat" ;;
+    nist/Thurber.dat)
+      printf '%s\n' "https://www.itl.nist.gov/div898/strd/nls/data/LINKS/DATA/Thurber.dat" ;;
+    nist/Rat42.dat)
+      printf '%s\n' "https://www.itl.nist.gov/div898/strd/nls/data/LINKS/DATA/Rat42.dat" ;;
+    nist/MGH09.dat)
+      printf '%s\n' "https://www.itl.nist.gov/div898/strd/nls/data/LINKS/DATA/MGH09.dat" ;;
+    nist/BoxBOD.dat)
+      printf '%s\n' "https://www.itl.nist.gov/div898/strd/nls/data/LINKS/DATA/BoxBOD.dat" ;;
+    nist/ENSO.dat)
+      printf '%s\n' "https://www.itl.nist.gov/div898/strd/nls/data/LINKS/DATA/ENSO.dat" ;;
     usgs/earthquakes_2025_m4p5.csv)
       printf '%s\n' "https://earthquake.usgs.gov/fdsnws/event/1/query.csv?starttime=2025-01-01&endtime=2025-12-31&minmagnitude=4.5&orderby=time" ;;
     cern/MuRun2010B_0.csv)
