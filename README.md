@@ -6,7 +6,7 @@
 
 Pure Rust implementation of Minuit-style parameter optimization algorithms, tested against [ROOT Minuit2](https://github.com/root-project/root/tree/master/math/minuit2) as a numerical reference.
 
-**No hand-written unsafe. No ROOT, GSL, C, or C++ dependency. Built for scientific workflows.**
+No hand-written `unsafe`. No ROOT, GSL, C, or C++ dependency.
 
 ## Table of Contents
 
@@ -48,13 +48,13 @@ Pure Rust implementation of Minuit-style parameter optimization algorithms, test
 
 ## Features
 
-- **Pure Rust.** No C++ toolchain and no hand-written unsafe blocks. Compiles on all tier-1 Rust targets (Linux, macOS, Windows).
-- **Robust Algorithms.** Migrad (Variable Metric / DFP), Simplex (Nelder-Mead with rho-extrapolation), Hesse (exact Hessian), Minos (asymmetric errors via likelihood contour walking), Scan (1D profiles), Contours (2D confidence regions).
-- **Analytical Gradients.** User-provided gradients via the `FCNGradient` trait for faster convergence and reduced function evaluations, especially in high-dimensional problems.
-- **Python Bindings.** High-performance [PyO3](https://pyo3.rs/) bindings with a measured `iminuit.Minuit`-compatible subset. Build with [maturin](https://www.maturin.rs/).
-- **Parallel Processing.** Optional [`rayon`](https://docs.rs/rayon) support for parallel 1D parameter scans.
-- **Numerical Stability.** Resilience tests cover FCNs that can return NaN or Infinity near invalid regions. Non-positive-definite covariance matrices are automatically corrected via eigenvalue shift.
-- **Tested against ROOT.** Differential testing against ROOT `v6-36-08` as a numerical reference, with 12 workloads, 415 traced symbols, and automated CI gates.
+- **Pure Rust.** No C++ toolchain, no hand-written `unsafe`. Compiles on all tier-1 Rust targets (Linux, macOS, Windows).
+- **Minimizers and error analysis.** Migrad (Variable Metric / DFP), Simplex (Nelder-Mead with rho-extrapolation), Hesse (exact Hessian), Minos (asymmetric errors via likelihood contour walking), Scan (1D profiles), Contours (2D confidence regions).
+- **Analytical gradients.** Supply derivatives through the `FCNGradient` trait to cut function evaluations, which matters most in high-dimensional fits.
+- **Python bindings.** [PyO3](https://pyo3.rs/) bindings exposing a measured `iminuit.Minuit`-compatible subset. Build with [maturin](https://www.maturin.rs/).
+- **Parallel scans.** Optional [`rayon`](https://docs.rs/rayon) support for 1D parameter scans.
+- **Numerical stability.** Tests cover FCNs that return NaN or infinity near invalid regions, and non-positive-definite covariance matrices are corrected via eigenvalue shift.
+- **Checked against ROOT.** Differential testing against ROOT `v6-36-08`: 12 workloads, 415 traced symbols, automated CI gates.
 
 ---
 
@@ -91,12 +91,12 @@ The `minimize` method accepts any `&impl FCN`, including closures. Parameters ar
 
 ### MnMigrad (Variable Metric)
 
-The primary workhorse. Uses a quasi-Newton method with the Davidon-Fletcher-Powell (DFP) rank-2 update of the approximate inverse Hessian. This is the same algorithm used in Fortran MINUIT since 1975 and in ROOT's C++ Minuit2.
+The default minimizer for smooth problems. A quasi-Newton method with the Davidon-Fletcher-Powell (DFP) rank-2 update of the approximate inverse Hessian — the same algorithm used in Fortran MINUIT since 1975 and in ROOT's C++ Minuit2.
 
-- **Convergence:** Quadratic near the minimum — typically the fastest for smooth, well-behaved functions.
-- **Output:** Approximate covariance matrix at the minimum (can be improved to exact by running Hesse afterwards).
-- **Use case:** Chi-square fits, maximum likelihood estimation, any smooth objective function.
-- **Not recommended for:** Discontinuous or very noisy functions — use Simplex instead.
+- **Convergence:** quadratic near the minimum, usually the fastest choice for smooth functions.
+- **Output:** approximate covariance matrix at the minimum (run Hesse afterwards to make it exact).
+- **Use case:** chi-square fits, maximum likelihood estimation, any smooth objective.
+- **Avoid for:** discontinuous or noisy functions — use Simplex instead.
 
 ```rust
 use minuit2::MnMigrad;
@@ -118,16 +118,16 @@ println!("y = {:.4} +/- {:.4}", state.value("y").unwrap(), state.error("y").unwr
 **Strategy levels:**
 - `0` — Low: fewest gradient evaluations, fastest, least precise.
 - `1` — Medium (default): good balance of speed and accuracy.
-- `2` — High: extra gradient evaluations for better precision, recommended for publication-quality results.
+- `2` — High: extra gradient evaluations for better precision; use this when error estimates matter.
 
 ### MnSimplex (Derivative-Free)
 
 Uses the Nelder-Mead simplex algorithm in the Minuit variant, which includes rho-extrapolation from the original Fortran MINUIT. This is *not* textbook Nelder-Mead — it lacks the shrink step and uses a centroid-based final evaluation.
 
-- **Robustness:** Very high. Can navigate non-smooth, noisy, or discontinuous landscapes.
-- **Performance:** Slower than Migrad for smooth functions (linear convergence vs. quadratic).
-- **Covariance:** Does *not* produce a covariance matrix. Run Hesse afterwards if you need errors.
-- **Use case:** Rugged landscapes (e.g., Goldstein-Price), noisy data, or as a pre-minimizer to get Migrad started from a better region.
+- **Robustness:** handles non-smooth, noisy, or discontinuous landscapes.
+- **Performance:** slower than Migrad on smooth functions (linear vs. quadratic convergence).
+- **Covariance:** none — run Hesse afterwards if you need errors.
+- **Use case:** rugged landscapes (e.g. Goldstein-Price), noisy data, or as a pre-minimizer that hands Migrad a better starting region.
 
 ```rust
 use minuit2::MnSimplex;
@@ -150,7 +150,7 @@ println!("Simplex found minimum: fval = {:.6}", result.fval());
 
 ### MnMinimize (Combined Strategy)
 
-Runs Simplex first to find a good starting region (robust global exploration), then refines with Migrad (fast local convergence). This is the recommended approach when you're unsure about the starting point or the landscape is complicated.
+Runs Simplex first to find a good starting region (broad exploration), then refines with Migrad (fast local convergence). Reach for this when you don't trust the starting point or the landscape is complicated.
 
 ```rust
 use minuit2::MnMinimize;
@@ -377,7 +377,7 @@ let result = MnMigrad::new()
 |----------|---------------------|-----|
 | Smooth chi-square/likelihood fit | `MnMigrad` | Quadratic convergence, produces covariance |
 | Unknown landscape, bad starting point | `MnMinimize` (Simplex + Migrad) | Simplex finds the basin, Migrad refines |
-| Noisy or discontinuous function | `MnSimplex` | No derivatives needed, very robust |
+| Noisy or discontinuous function | `MnSimplex` | No derivatives needed, tolerant of rough landscapes |
 | High-dimensional (>20 params) | `MnMigrad` + analytical gradients | Saves 2N evaluations per gradient step |
 | Need asymmetric errors | `MnMigrad` → `MnHesse` → `MnMinos` | Full error pipeline |
 | Need exact parabolic errors | `MnMigrad` → `MnHesse` | Hesse gives exact Hessian-based errors |
@@ -612,7 +612,7 @@ let scan = MnScan::new(&fcn, &min);
 let points = scan.scan_parallel(0, 1000, -10.0, 10.0);
 ```
 
-**Performance note:** Parallel scans have overhead from thread pool management. For small scans (<100 points) or very fast FCNs, the serial `scan()` may be faster. Parallel scans shine when the FCN is expensive (e.g., numerical integration, simulation) and the number of points is large.
+**Performance note:** parallel scans carry thread-pool overhead. For small scans (<100 points) or very fast FCNs, serial `scan()` may be faster. The parallel path pays off when the FCN is expensive (numerical integration, simulation) and the point count is large.
 
 ---
 
@@ -778,15 +778,15 @@ For each parameter, Minos finds the points where f(x) = f_min + UP by:
 
 ## Numerical Stability and Robustness
 
-`minuit2-rs` implements several safety layers to ensure reliability in scientific workflows:
+A few specific measures guard against the failure modes that show up in real fits:
 
-1. **NaN/Inf Resilience:** Robustness tests cover objectives that return `NaN` or `Inf` near invalid parameter regions, and internal floating-point ordering uses NaN-safe comparisons where ordering is required.
+1. **NaN/Inf resilience:** robustness tests cover objectives that return `NaN` or `Inf` near invalid parameter regions, and internal floating-point ordering uses NaN-safe comparisons where ordering is required.
 
-2. **Positive-Definite Correction (MnPosDef):** If the covariance matrix becomes non-positive-definite (due to negative curvature, numerical precision loss, or a saddle point), the library automatically applies an eigenvalue shift to restore positive-definiteness. This tracks whether a diagonal shift was needed before the eigenvalue check.
+2. **Positive-definite correction (MnPosDef):** if the covariance matrix becomes non-positive-definite (negative curvature, precision loss, or a saddle point), the library applies an eigenvalue shift to restore positive-definiteness, tracking whether a diagonal shift was needed before the eigenvalue check.
 
-3. **Safe Floating-Point Sorting:** All internal sorting operations (in LineSearch, Minos, and Simplex) use `total_cmp`-based NaN-safe comparisons to prevent panics during extreme numerical instability.
+3. **Safe floating-point sorting:** internal sorting (in LineSearch, Minos, and Simplex) uses `total_cmp`-based NaN-safe comparisons to avoid panics under extreme numerical instability.
 
-4. **Stress Testing:** The library is validated against:
+4. **Stress testing:** the library is validated against:
    - The **Goldstein-Price** function (multiple local minima, steep gradients).
    - High-dimensional (**50D**) quadratic bowls.
    - Adversarial inputs (NaN/Inf FCN returns, degenerate starting points, boundary edge cases).
@@ -795,11 +795,11 @@ For each parameter, Minos finds the points where f(x) = f_min + UP by:
 
 ## Architecture: Differences from C++ Minuit2
 
-The implementation is organized as Rust-native code with architectural differences from C++ Minuit2:
+The port keeps the algorithms but reorganizes the surrounding structure to fit Rust:
 
 | C++ Minuit2 | Rust minuit2-rs | Rationale |
 |-------------|-----------------|-----------|
-| 28 custom LA files (MnMatrix, LAVector, etc.) | `nalgebra` DVector/DMatrix | Battle-tested LA library, no maintenance burden |
+| 28 custom LA files (MnMatrix, LAVector, etc.) | `nalgebra` DVector/DMatrix | Established LA library, nothing to maintain in-crate |
 | Smart pointers, BasicMinimumSeed/State pairs | Flat structs with ownership | Rust ownership model replaces refcounting |
 | `MnFcn::operator()` | `FCN::value()` | Avoids Rust nightly `Fn::call()` name collision |
 | `DavidonErrorUpdator` class hierarchy | Inline DFP update in builder.rs | Single algorithm, no need for trait dispatch |
@@ -855,9 +855,8 @@ Rosenbrock workload uses a harder start and reports a higher NFCN.)
 
 ## Pure Rust vs C++ Minuit2
 
-This is a from-scratch Rust reimplementation, not a binding — so the honest
-question is what you trade by leaving the C++/Fortran original behind. No
-sugar-coating:
+This is a Rust reimplementation, not a binding, so it's worth being explicit
+about what you trade by leaving the C++/Fortran original behind.
 
 **Function evaluations (NFCN), head-to-head on identical workloads** (from the
 ROOT `v6-36-08` differential harness — the only apples-to-apples measurement):
@@ -872,8 +871,8 @@ ROOT `v6-36-08` differential harness — the only apples-to-apples measurement):
 | Quadratic (fixed param) — Hesse | 39 | 19 | fewer |
 | Quadratic (fixed param) — Migrad | 29 | 5 | fewer |
 
-It is **mixed, not uniformly slower**: on the hard curved valley (Rosenbrock) the
-Rust DFP path currently spends ~40% more function evaluations than C++; on
+The result is mixed, not uniformly slower: on the hard curved valley (Rosenbrock)
+the Rust DFP path currently spends ~40% more function evaluations than C++; on
 several other workloads it spends fewer or the same. These deltas come from small
 convergence-path differences, not a different algorithm.
 
@@ -897,11 +896,12 @@ does not affect the function-evaluation comparison above.
 
 ### What you give up / pay
 - **Sometimes more function evaluations** on hard problems (Rosenbrock +42% above).
-- **Less battle-tested robustness** on a few ill-conditioned problems — see
-  [Testing](#testing): 4 NIST StRD datasets are not yet solved out of the box.
+- **Less field exposure** than 40+ years of MINUIT — a few ill-conditioned
+  problems still trip it up; see [Testing](#testing): 4 NIST StRD datasets are not
+  yet solved out of the box.
 - **No rigorous wall-clock benchmark vs C++** yet.
 
-**Bottom line:** algorithmically equivalent and numerically validated against ROOT,
+In short: algorithmically equivalent and numerically validated against ROOT,
 occasionally less call-efficient on hard problems, in exchange for a
 dependency-free, memory-safe, easy-to-embed pure-Rust library.
 
