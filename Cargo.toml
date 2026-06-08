@@ -36,7 +36,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 nalgebra = "0.33"
-rayon = { version = "1.10", optional = true }
+rayon = { version = "1.12", optional = true }
 pyo3 = { version = "0.28", optional = true, features = ["extension-module", "abi3-py39"] }
 numpy = { version = "0.28", optional = true }
 
