@@ -928,15 +928,22 @@ dependency-free, memory-safe, easy-to-embed pure-Rust library.
 
 ## Testing
 
-`minuit2` is validated by a layered suite (**148 tests** across 17 integration
-files plus unit and doc tests — `cargo test --all-features`):
+`minuit2` is validated by a layered suite (unit and doc tests plus integration
+files — `cargo test --all-features`):
 
 - **Unit + integration tests** — minimizer behaviour, error analysis, scans,
   contours, bounded/fixed parameters, and NaN/panic robustness.
-- **NIST StRD certified-oracle tests** (`tests/nist_strd_certified.rs`) — fit 8
-  official NIST Statistical Reference Datasets (Misra1a, Misra1b, Chwirut2,
-  Rat42, Kirby2, Thurber, Gauss1, ENSO) from the NIST "Start 2" values and
-  assert convergence to the **NIST-certified** parameter values.
+- **NIST StRD certified-oracle tests** (`tests/nist_strd_certified.rs`) — plain
+  Migrad from the NIST "Start 2" values certifies 9 official datasets:
+  Misra1a, Misra1b, BoxBOD, Chwirut2, Rat42, Kirby2, Thurber, Gauss1, and ENSO.
+  A separate ignored hard tier (`nist_hard_via_recipe`) certifies 3 additional
+  datasets — Lanczos3, MGH09, and Hahn1 — through the documented deterministic
+  hard-mode recipe in `examples/nist_strd_hard.rs` (NIST Start 1/Start 2-derived
+  grids, a deterministic Lanczos3 profiled-LS pre-pass, Simplex pre-pass,
+  Migrad+Hesse, and explicit Hahn1 user-model x rescaling).
+  See `reports/parity/nist_hard_baseline.md`: BoxBOD passes plain in both libs;
+  iminuit also fails Lanczos3 and MGH09 plain, while Hahn1 remains a filed core
+  divergence and is not claimed resolved by the recipe.
 - **Property-based metamorphic tests** (`tests/proptest_metamorphic.rs`) —
   randomized translation / scaling / permutation / start-point invariances via
   `proptest`; oracle-free, over many sampled inputs.

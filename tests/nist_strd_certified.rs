@@ -28,7 +28,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
-use minuit2::{FCN, MnMigrad};
+use minuit2::{MnHesse, MnMigrad, MnMinimize, FCN};
 
 /// Resolve a path relative to the crate manifest directory.
 fn repo_path(rel: &str) -> PathBuf {
@@ -298,6 +298,45 @@ fn model_misra1a(p: &[f64], x: f64) -> f64 {
     p[0] * (1.0 - (-p[1] * x).exp())
 }
 
+// Lanczos3: y = b1*exp(-b2*x) + b3*exp(-b4*x) + b5*exp(-b6*x)
+fn model_lanczos3(p: &[f64], x: f64) -> f64 {
+    p[0] * (-p[1] * x).exp() + p[2] * (-p[3] * x).exp() + p[4] * (-p[5] * x).exp()
+}
+
+// MGH09: y = b1*(x^2+x*b2) / (x^2+x*b3+b4)
+fn model_mgh09(p: &[f64], x: f64) -> f64 {
+    let x2 = x * x;
+    let den = x2 + x * p[2] + p[3];
+    if den.abs() < 1e-300 {
+        return f64::NAN;
+    }
+    p[0] * (x2 + x * p[1]) / den
+}
+
+const HAHN_X_SCALE: f64 = 1_000.0;
+
+// Hahn1 user-level rescaling: fit q in z=x/1000 and map back to original b.
+fn model_hahn1_scaled(q: &[f64], x: f64) -> f64 {
+    let z = x / HAHN_X_SCALE;
+    let z2 = z * z;
+    let z3 = z2 * z;
+    let den = 1.0 + q[4] * z + q[5] * z2 + q[6] * z3;
+    if den.abs() < 1e-300 {
+        return f64::NAN;
+    }
+    (q[0] + q[1] * z + q[2] * z2 + q[3] * z3) / den
+}
+
+fn hahn_scale_factors() -> [f64; 7] {
+    let s = HAHN_X_SCALE;
+    [1.0, s, s * s, s * s * s, s, s * s, s * s * s]
+}
+
+fn hahn_from_scaled(q: &[f64]) -> Vec<f64> {
+    let scales = hahn_scale_factors();
+    q.iter().enumerate().map(|(i, &v)| v / scales[i]).collect()
+}
+
 // Misra1b: y = b1 * (1 - (1 + b2*x/2)^(-2))
 fn model_misra1b(p: &[f64], x: f64) -> f64 {
     let base = 1.0 + p[1] * x / 2.0;
@@ -387,6 +426,15 @@ fn nist_misra1b() {
 
 // Lower difficulty. Tolerance 1e-3.
 #[test]
+fn nist_boxbod() {
+    let ds = load("BoxBOD", 2);
+    let (p, valid, _) = fit(&ds, model_misra1a, &ds.start2, &[], 1e-4);
+    assert!(valid, "BoxBOD: migrad should converge");
+    assert_certified(&ds, &p, 1e-3);
+}
+
+// Lower difficulty. Tolerance 1e-3.
+#[test]
 fn nist_chwirut2() {
     let ds = load("Chwirut2", 3);
     let (p, valid, _) = fit(&ds, model_chwirut2, &ds.start2, &[], 1e-4);
@@ -439,25 +487,307 @@ fn nist_enso() {
     assert_certified(&ds, &p, 1e-2);
 }
 
-// NOTE on SKIPPED datasets (curated for honesty, NOT forced to pass by weakening
-// tolerances). Each is omitted because plain MnMigrad from NIST "Start 2" does
-// not reach the certified global minimum without extra machinery, and masking a
-// non-converged fit with a loose tolerance would defeat the purpose of an oracle
-// test. The bundled `examples/nist_strd` demo handles such cases with multistart
-// search and parameter rescaling.
-//
-// - Lanczos3 (certified RSS = 1.6e-8, an essentially exact fit): the three
-//   exponential terms are extremely correlated. From Start 2 plain MnMigrad lands
-//   in a different basin (finite RSS, swapped/merged components) rather than the
-//   certified parameters.
-//
-// - BoxBOD: the Start 2 values (b1=100, b2=0.75) sit on a near-flat plateau of
-//   the exponential model; plain MnMigrad does not reach the certified minimum
-//   (b1=213.8, b2=0.547) from there.
-//
-// - MGH09: rational linear/quadratic model whose Start 2 point lies in a region
-//   from which plain MnMigrad does not reach the certified minimum.
-//
-// - Hahn1: rational cubic/cubic model that requires x-axis rescaling to be well
-//   conditioned (see `examples/nist_strd` `hahn_to_scaled`). Out of scope for a
-//   plain-Start-2 oracle test.
+fn identity_params(p: &[f64]) -> Vec<f64> {
+    p.to_vec()
+}
+
+fn hard_fit(
+    ds: &NistDataset,
+    model: fn(&[f64], f64) -> f64,
+    starts: &[Vec<f64>],
+    minimizer_tolerance: f64,
+    rel_tol: f64,
+    to_cert_space: fn(&[f64]) -> Vec<f64>,
+) -> Result<Vec<f64>, String> {
+    let fcn = LeastSquaresFCN {
+        x: ds.x.clone(),
+        y: ds.y.clone(),
+        model,
+    };
+    let mut log = String::new();
+    let mut best: Option<(Vec<f64>, f64, bool)> = None;
+    for (start_idx, start) in starts.iter().enumerate() {
+        let mut pre = MnMinimize::new();
+        for (i, value) in start.iter().enumerate() {
+            pre = pre.add(
+                format!("b{}", i + 1),
+                *value,
+                (value.abs() * 0.05).max(1e-6),
+            );
+        }
+        let pre_min = pre
+            .with_strategy(2)
+            .tolerance(minimizer_tolerance)
+            .max_fcn(200_000)
+            .minimize(&fcn);
+
+        let mut current = pre_min.params();
+        for refine_idx in 0..3 {
+            let mut migrad = MnMigrad::new();
+            for (i, value) in current.iter().enumerate() {
+                migrad = migrad.add(format!("b{}", i + 1), *value, (value.abs() * 0.1).max(1e-7));
+            }
+            let min = migrad
+                .with_strategy(2)
+                .tolerance(minimizer_tolerance)
+                .max_fcn(500_000)
+                .minimize(&fcn);
+            let hesse = MnHesse::new().calculate(&fcn, &min);
+            let fit_params = hesse.params();
+            let params = to_cert_space(&fit_params);
+            let valid = hesse.is_valid();
+            let fval = hesse.fval();
+            let worst_rel = ds
+                .certified
+                .iter()
+                .zip(params.iter())
+                .map(|(&cert, &fit)| (fit - cert).abs() / cert.abs().max(1e-300))
+                .fold(0.0_f64, f64::max);
+            let rendered: Vec<String> = params.iter().map(|p| format!("{p:.9e}")).collect();
+            log.push_str(&format!(
+                "{} start {start_idx}.{refine_idx}: valid={valid} fval={fval:.8e} worst_rel={worst_rel:.3e} params=[{}]\n",
+                ds.name,
+                rendered.join(", ")
+            ));
+            if valid && worst_rel <= rel_tol {
+                print!("{log}");
+                return Ok(params);
+            }
+            match &best {
+                None => best = Some((params, fval, valid)),
+                Some((_, best_fval, _)) if fval < *best_fval => best = Some((params, fval, valid)),
+                Some(_) => {}
+            }
+            current = fit_params;
+        }
+    }
+    let best_summary = best
+        .as_ref()
+        .map(|(params, fval, valid)| {
+            let rendered: Vec<String> = params.iter().map(|p| format!("{p:.9e}")).collect();
+            format!(
+                "valid={valid} fval={fval:.8e} params=[{}]",
+                rendered.join(", ")
+            )
+        })
+        .unwrap_or_else(|| "none".to_string());
+    Err(format!(
+        "{} recipe did not certify. Per-start log:\n{log}best={best_summary}",
+        ds.name
+    ))
+}
+
+fn hard_grid(start1: &[f64], start2: &[f64]) -> Vec<Vec<f64>> {
+    let mut starts = Vec::new();
+    for anchor in [start2, start1] {
+        starts.push(anchor.to_vec());
+        for factor in [0.5, 0.8, 0.98, 1.02, 1.25, 2.0] {
+            starts.push(anchor.iter().map(|v| v * factor).collect());
+        }
+        for idx in 0..anchor.len() {
+            let mut up = anchor.to_vec();
+            up[idx] *= 1.5;
+            starts.push(up);
+            let mut down = anchor.to_vec();
+            down[idx] *= 0.5;
+            starts.push(down);
+        }
+    }
+    starts
+}
+
+fn solve_linear<const N: usize>(mut a: [[f64; N]; N], mut b: [f64; N]) -> Option<[f64; N]> {
+    for col in 0..N {
+        let mut pivot = col;
+        for row in (col + 1)..N {
+            if a[row][col].abs() > a[pivot][col].abs() {
+                pivot = row;
+            }
+        }
+        if a[pivot][col].abs() < 1e-300 {
+            return None;
+        }
+        if pivot != col {
+            a.swap(col, pivot);
+            b.swap(col, pivot);
+        }
+        let diag = a[col][col];
+        for item in a[col].iter_mut().skip(col) {
+            *item /= diag;
+        }
+        b[col] /= diag;
+        let pivot_row = a[col];
+        for row in 0..N {
+            if row == col {
+                continue;
+            }
+            let factor = a[row][col];
+            for (j, item) in a[row].iter_mut().enumerate().skip(col) {
+                *item -= factor * pivot_row[j];
+            }
+            b[row] -= factor * b[col];
+        }
+    }
+    Some(b)
+}
+
+fn lanczos_profiled_start(ds: &NistDataset) -> Vec<f64> {
+    let base_rates = [ds.start2[1], ds.start2[3], ds.start2[5]];
+    let factors = [0.5, 0.7, 0.8, 1.0, 1.4];
+    let mut best: Option<(f64, Vec<f64>)> = None;
+    for f0 in factors {
+        for f1 in factors {
+            for f2 in factors {
+                let rates = [base_rates[0] * f0, base_rates[1] * f1, base_rates[2] * f2];
+                if !(rates[0] > 0.0 && rates[0] < rates[1] && rates[1] < rates[2]) {
+                    continue;
+                }
+                let mut normal = [[0.0; 3]; 3];
+                let mut rhs = [0.0; 3];
+                for (&x, &y) in ds.x.iter().zip(&ds.y) {
+                    let basis = [
+                        (-rates[0] * x).exp(),
+                        (-rates[1] * x).exp(),
+                        (-rates[2] * x).exp(),
+                    ];
+                    for i in 0..3 {
+                        rhs[i] += basis[i] * y;
+                        for j in 0..3 {
+                            normal[i][j] += basis[i] * basis[j];
+                        }
+                    }
+                }
+                let Some(amps) = solve_linear(normal, rhs) else {
+                    continue;
+                };
+                let params = vec![amps[0], rates[0], amps[1], rates[1], amps[2], rates[2]];
+                let rss = LeastSquaresFCN {
+                    x: ds.x.clone(),
+                    y: ds.y.clone(),
+                    model: model_lanczos3,
+                }
+                .value(&params);
+                match &best {
+                    None => best = Some((rss, params)),
+                    Some((best_rss, _)) if rss < *best_rss => best = Some((rss, params)),
+                    Some(_) => {}
+                }
+            }
+        }
+    }
+    let mut params = best
+        .expect("Lanczos3 profiled scan should have candidates")
+        .1;
+    let fcn = LeastSquaresFCN {
+        x: ds.x.clone(),
+        y: ds.y.clone(),
+        model: model_lanczos3,
+    };
+    let mut lambda = 1e-3;
+    let mut current_rss = fcn.value(&params);
+    for _ in 0..200 {
+        let mut normal = [[0.0; 6]; 6];
+        let mut gradient = [0.0; 6];
+        for (&x, &y) in ds.x.iter().zip(&ds.y) {
+            let e1 = (-params[1] * x).exp();
+            let e2 = (-params[3] * x).exp();
+            let e3 = (-params[5] * x).exp();
+            let pred = params[0] * e1 + params[2] * e2 + params[4] * e3;
+            let residual = pred - y;
+            let jac = [
+                e1,
+                -params[0] * x * e1,
+                e2,
+                -params[2] * x * e2,
+                e3,
+                -params[4] * x * e3,
+            ];
+            for i in 0..6 {
+                gradient[i] += jac[i] * residual;
+                for j in 0..6 {
+                    normal[i][j] += jac[i] * jac[j];
+                }
+            }
+        }
+        let mut damped = normal;
+        for (i, row) in damped.iter_mut().enumerate() {
+            row[i] *= 1.0 + lambda;
+        }
+        let rhs = gradient.map(|v| -v);
+        let Some(delta) = solve_linear(damped, rhs) else {
+            lambda *= 10.0;
+            continue;
+        };
+        let candidate: Vec<f64> = params.iter().zip(delta).map(|(&p, d)| p + d).collect();
+        if candidate.iter().all(|v| v.is_finite())
+            && candidate[1] > 0.0
+            && candidate[3] > 0.0
+            && candidate[5] > 0.0
+        {
+            let rss = fcn.value(&candidate);
+            if rss < current_rss {
+                params = candidate;
+                current_rss = rss;
+                lambda /= 3.0;
+                continue;
+            }
+        }
+        lambda *= 10.0;
+    }
+    params
+}
+
+fn hahn_to_scaled(b: &[f64]) -> Vec<f64> {
+    let scales = hahn_scale_factors();
+    b.iter().enumerate().map(|(i, &v)| v * scales[i]).collect()
+}
+
+#[test]
+#[ignore = "hard deterministic multistart recipe; run with `cargo test --test nist_strd_certified -- --ignored`"]
+fn nist_hard_via_recipe() {
+    // Deterministic user-level recipe, mirrored in examples/nist_strd_hard.rs:
+    // NIST Start 1/Start 2-derived grids (no RNG), a Lanczos3 profiled-LS
+    // pre-pass, Simplex->Migrad pre-pass via MnMinimize, final Migrad+Hesse,
+    // and explicit Hahn1 x-rescaling in the user model.
+    let lanczos = load("Lanczos3", 6);
+    let mut lanczos_starts = hard_grid(&lanczos.start1, &lanczos.start2);
+    lanczos_starts.insert(0, lanczos_profiled_start(&lanczos));
+    let p = hard_fit(
+        &lanczos,
+        model_lanczos3,
+        &lanczos_starts,
+        1e-6,
+        1e-3,
+        identity_params,
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+    assert_certified(&lanczos, &p, 1e-3);
+
+    let mgh09 = load("MGH09", 4);
+    let mgh09_starts = hard_grid(&mgh09.start1, &mgh09.start2);
+    let p = hard_fit(
+        &mgh09,
+        model_mgh09,
+        &mgh09_starts,
+        1e-6,
+        1e-2,
+        identity_params,
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+    assert_certified(&mgh09, &p, 1e-2);
+
+    let hahn = load("Hahn1", 7);
+    let hahn_start1 = hahn_to_scaled(&hahn.start1);
+    let hahn_start2 = hahn_to_scaled(&hahn.start2);
+    let hahn_scaled_starts = hard_grid(&hahn_start1, &hahn_start2);
+    let p = hard_fit(
+        &hahn,
+        model_hahn1_scaled,
+        &hahn_scaled_starts,
+        1e-6,
+        1e-3,
+        hahn_from_scaled,
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+    assert_certified(&hahn, &p, 1e-3);
+}

@@ -62,3 +62,14 @@
 - Fixes landed: per-coordinate repair + full-gradient recompute (was all-coords vector step, NegativeG2LineSearch.cxx:62-123); ROOT step direction -gstep for grad>=0 in ROOT-reachable branch (cxx:80-83); signed 1/G2 covariance rebuild + EDM<0 not-posdef flag at the NG2LS site only (cxx:125-140).
 - Cycle notes: 2 fix rounds. Round 1 coder BLOCKED on cargo-llvm-cov (known env gap, still open) + clang++ probe false-alarmed executed-surface gate (ABI symbol drift); Codex review found the 3 real gaps. Round 2 stop condition fired correctly on F1 vs limit_boundary; resolved by branch split (ROOT direction where ROOT executes, waived direction where ROOT skips).
 - Follow-ups: none new (cargo-llvm-cov install remains a standing user decision from 9ma).
+
+## 2026-06-10 — minuit2-rs-7qf: Multistart/rescaling recipe for the 4 hard NIST datasets
+- AC1 BoxBOD promoted to plain tier: PASS — plain tier now 9 passed (stale skip note removed).
+- AC2 recipe (examples/nist_strd_hard.rs): PASS — NIST Start 1/2 grids only (parsed from committed .dat), Lanczos3 profiled-LS pre-pass, Simplex→Migrad via MnMinimize, final Migrad+Hesse, Hahn1 z=x/1000 user-model rescaling; certified values used for assertions only.
+- AC3 hard test tier: PASS — nist_hard_via_recipe (#[ignore]) certifies Lanczos3 (worst_rel 1.5e-10, tol 1e-3), MGH09 (9.96e-4, tol 1e-2), Hahn1 (2.98e-5, tol 1e-3); per-start logging; tolerances follow existing difficulty-tier scheme.
+- AC4 determinism: PASS — double-run identical (gate runs hard tier twice).
+- AC5 README Testing: PASS — 9 plain + 3 via documented recipe, cites nist_hard_baseline.md.
+- AC6 Hahn1 core bead filed: PASS — minuit2-rs-j2j (source: supervisor cycle minuit2-rs-7qf); k5h did NOT fix the core gap (re-ran baseline: statuses unchanged, NFCN shifts only, committed as chore 611dea5).
+- AC7 gates: PASS (re-ran all myself) — gate exit 0, cargo test --all-features 0 failures, clippy --all-targets clean, default wall-time unaffected (hard tier ignored).
+- Cycle notes: 1 fix round — initial submission seeded multistart anchors with ROUNDED CERTIFIED VALUES (weakened oracle, caught by Codex review, verified vs .dat starts), used 1e-2 for 1e-3-tier datasets, and had test/example grid drift; all three re-briefed and fixed. Supervisor touch-up: 2 clippy use_debug lints in example (coder ran clippy without --all-targets).
+- Follow-ups: minuit2-rs-j2j (Hahn1 core divergence) already filed by the cycle.
