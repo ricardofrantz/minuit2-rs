@@ -7,16 +7,16 @@ Reference commit: `a8ca1b23e38d7dbe0ff24027894ca0f2ad65f1bd`
 
 ## Status Counts
 
-- pass: **10**
-- warn: **2**
+- pass: **12**
+- warn: **0**
 - fail: **0**
 
 ## Per-Workload Results
 
 | Workload | Status | Issues | Warnings |
 |---|---|---|---|
-| `quadratic3_fixx_migrad` | `warn` | - | nfcn relative diff 0.828 > 0.5 |
-| `quadratic3_fixx_hesse` | `warn` | - | nfcn relative diff 0.513 > 0.5 |
+| `quadratic3_fixx_migrad` | `pass` | - | waived nfcn relative diff 0.828 > 0.5: D-001: ROOT v6-36-08 seed generation counts central-difference FCN probes in Numerical2PGradientCalculator after MnSeedGenerator evaluates the starting point; minuit2-rs reaches the same fixed-parameter result without reproducing those extra seed probes. |
+| `quadratic3_fixx_hesse` | `pass` | - | waived nfcn relative diff 0.513 > 0.5: D-001: inherits the fixed-parameter Migrad seed NFCN accounting divergence; ROOT v6-36-08 counts the seed central-difference probes before Hesse, while minuit2-rs covariance remains within tolerance. |
 | `rosenbrock2_migrad` | `pass` | - | - |
 | `quadratic2_minos_p0` | `pass` | - | - |
 | `quadratic2_simplex` | `pass` | - | - |

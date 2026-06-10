@@ -153,12 +153,18 @@ def compare(ref: dict[str, Any], rust: dict[str, Any], tol: dict[str, float]) ->
     nfcn_rel = relative_diff(nfcn_ref, nfcn_rust)
     nfcn_rel_warn = float(tol.get("nfcn_rel_warn", 1.0))
     if nfcn_rel > nfcn_rel_warn:
-        warnings.append(f"nfcn relative diff {nfcn_rel:.3f} > {nfcn_rel_warn}")
+        nfcn_waiver = tol.get("nfcn_rel_waiver")
+        if isinstance(nfcn_waiver, str) and nfcn_waiver.strip():
+            warnings.append(f"waived nfcn relative diff {nfcn_rel:.3f} > {nfcn_rel_warn}: {nfcn_waiver.strip()}")
+        else:
+            warnings.append(f"nfcn relative diff {nfcn_rel:.3f} > {nfcn_rel_warn}")
+
+    effective_warnings = [w for w in warnings if not w.startswith("waived ")]
 
     status = "pass"
     if issues:
         status = "fail"
-    elif warnings:
+    elif effective_warnings:
         status = "warn"
 
     return DiffOutcome(

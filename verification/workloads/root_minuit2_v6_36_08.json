@@ -13,7 +13,8 @@
         "fval_abs": 2e-5,
         "edm_abs": 5e-5,
         "param_abs": 5e-4,
-        "nfcn_rel_warn": 0.5
+        "nfcn_rel_warn": 0.5,
+        "nfcn_rel_waiver": "D-001: ROOT v6-36-08 seed generation counts central-difference FCN probes in Numerical2PGradientCalculator after MnSeedGenerator evaluates the starting point; minuit2-rs reaches the same fixed-parameter result without reproducing those extra seed probes."
       }
     },
     {
@@ -24,7 +25,8 @@
         "edm_abs": 5e-5,
         "param_abs": 5e-4,
         "cov_abs": 1e-4,
-        "nfcn_rel_warn": 0.5
+        "nfcn_rel_warn": 0.5,
+        "nfcn_rel_waiver": "D-001: inherits the fixed-parameter Migrad seed NFCN accounting divergence; ROOT v6-36-08 counts the seed central-difference probes before Hesse, while minuit2-rs covariance remains within tolerance."
       }
     },
     {

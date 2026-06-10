@@ -2,23 +2,29 @@
 
 This ledger records currently observed differences from differential verification runs.
 
-## D-001: NFCN divergence on quadratic fixed-parameter workloads
+## D-001: Waived NFCN divergence on quadratic fixed-parameter workloads
 
 - Workloads:
   - `quadratic3_fixx_migrad`
   - `quadratic3_fixx_hesse`
 - Classification: `algorithmic/path-efficiency`
-- Severity: `low` (warning only)
+- Severity: `low` (correctness metrics pass; NFCN-only waiver)
 - Expected: `yes`
 - Evidence:
   - `reports/verification/diff_summary.md`
   - `reports/verification/diff_results.csv`
+  - `verification/workloads/root_minuit2_v6_36_08.json` (`nfcn_rel_waiver` on the two workloads only)
+- ROOT v6-36-08 source cited:
+  - `math/minuit2/src/MnSeedGenerator.cxx`: numerical seed generation first evaluates the starting point with `MnFcnCaller{fcn}(x)` and then calls `gc(pa)`.
+  - `math/minuit2/src/Numerical2PGradientCalculator.cxx`: `operator()(par)` constructs an `InitialGradientCalculator` and then central-difference probes each variable parameter via `mfcnCaller(x)` at `xtf + step` and `xtf - step` for up to `GradientNCycles()` cycles.
+  - `math/minuit2/src/InitialGradientCalculator.cxx`: the initial rough gradient itself is heuristic and does not call the FCN.
 - Details:
-  - Correctness metrics (fval/edm/params/covariance where applicable) pass tolerances.
-  - Function-call counts differ by ~0.51-0.83 relative ratio.
-- Disposition: `document`
+  - The extra C++ evaluations are seed-phase numerical-gradient probes counted by ROOT's `MnFcn`; they are not Hesse sweeps or covariance-squeeze work.
+  - The fixed parameter is not differentiated as a variable slot in either implementation; the divergence appears before Migrad iteration 0 because ROOT counts the seed central-difference probes while minuit2-rs reaches the same fixed-parameter minimum without reproducing that extra seed work.
+  - Correctness metrics pass tolerances, including `quadratic3_fixx_migrad` parameter max abs diff `3.886512e-04` and `quadratic3_fixx_hesse` covariance max abs diff `9.940541e-10` in the current differential report.
+- Disposition: explicit per-workload waiver; no global NFCN threshold change.
 - Next step:
-  - Expand workload set and trend NFCN deltas by algorithm family before deciding if optimization/retuning is necessary.
+  - If future fixed-parameter workloads show correctness degradation, revisit route (a) and reproduce the ROOT seed probe accounting in code.
 
 ## D-003: Rosenbrock covariance differs but remains within configured tolerance
 

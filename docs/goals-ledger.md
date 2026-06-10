@@ -35,3 +35,11 @@
 - AC5 README NFCN table: PASS — table + prose updated; "+42%" claim replaced with measured parity.
 - Note: coder exited BLOCKED (wrapper exit 4) solely on run_full_verification.sh's coverage step — cargo-llvm-cov not installed on this box (ask-first honored). diff_results.csv + all raw refs regenerated fine; ROOT ref JSONs shifted at ~1e-9 (runner rebuild), nfcn refs unchanged.
 - Follow-ups: env — install cargo-llvm-cov (user decision) so the full script's coverage tier runs; bead k5h (seed audit) remains relevant — divergence fixed here was the gradient calculator, not escape_negative_curvature.
+
+## 2026-06-10 — minuit2-rs-b9e: Resolve quadratic3_fixx NFCN warnings (route b: waiver)
+- AC1 diff_summary warn=0: PASS — re-ran compare_ref_vs_rust.py myself: pass=12 warn=0 fail=0. Mechanism: per-workload `nfcn_rel_waiver` string in verification/workloads/root_minuit2_v6_36_08.json; "waived" warnings excluded from status; global 0.5 threshold untouched.
+- AC2 written explanation citing ROOT source: PASS — known_differences.md D-001 cites MnSeedGenerator.cxx (start-point eval + gc(pa)), Numerical2PGradientCalculator.cxx (central-diff probes per variable param per cycle), InitialGradientCalculator.cxx (heuristic, no FCN). Consistent with the mhl trace (iter-0 fixx: Rust nfcn 1 vs ROOT 7).
+- AC3 (route-a only) n/a — correctness already within tolerance (param max abs 3.9e-4 < 5e-4 tol; hesse cov 9.9e-10).
+- AC4 tests + no regressions: PASS — cargo test --all-features 0 failures (re-ran); rosenbrock rows keep nfcn_rel 0.0071/0.093; only the 5 in-scope files changed.
+- Supervisor reservation: the waiver explains the iteration-0 seed accounting, but the TOTAL gap (5 vs 29 calls) implies ROOT also spends per-iteration gradient probes Rust skips; bead k5h (seed-phase parity audit) owns the deeper question — waiver's next-step clause points back to route (a) if quality ever degrades.
+- Follow-ups: none new (k5h already filed).
