@@ -199,6 +199,22 @@ def c_fix_release_roundtrip(M):
     return [m.values["a"], m.values["b"]]
 
 
+def c_scan_quadratic_bad_start(M):
+    m = M(cost, a=-4.0, b=7.0)
+    m.errors["a"] = 6.0
+    m.errors["b"] = 6.0
+    m.scan(ncall=100)
+    return [m.values["a"], m.values["b"], m.fval]
+
+
+def c_scan_bounded_parameter(M):
+    m = M(cost, a=-4.0, b=7.0)
+    m.limits["a"] = (0.0, 2.0)
+    m.errors["b"] = 6.0
+    m.scan(ncall=100)
+    return [m.values["a"], m.values["b"], m.fval]
+
+
 CHECKS = [
     ("construct_kwargs", c_construct_kwargs),
     ("construct_positional", c_construct_positional),
@@ -227,6 +243,8 @@ CHECKS = [
     ("default_errordef", c_default_errordef),
     ("multi_param_minos", c_multi_param_minos),
     ("fix_release_roundtrip", c_fix_release_roundtrip),
+    ("scan_quadratic_bad_start", c_scan_quadratic_bad_start),
+    ("scan_bounded_parameter", c_scan_bounded_parameter),
 ]
 
 

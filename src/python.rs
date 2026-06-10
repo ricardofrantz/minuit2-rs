@@ -66,7 +66,8 @@ struct StoredMError {
     min: f64,
 }
 
-#[pyclass(frozen)]
+#[pyclass(frozen, skip_from_py_object)]
+#[derive(Clone)]
 struct FMin {
     fval: f64,
     edm: f64,
@@ -559,6 +560,7 @@ struct Minuit {
     init_errors: HashMap<String, f64>,
     init_fixed: HashSet<String>,
     init_limits: HashMap<String, (Option<f64>, Option<f64>)>,
+    scan_fmin: Option<FMin>,
 }
 
 #[pymethods]
@@ -661,6 +663,7 @@ impl Minuit {
             init_errors,
             init_fixed,
             init_limits,
+            scan_fmin: None,
         })
     }
 
@@ -780,17 +783,24 @@ impl Minuit {
 
     #[getter]
     fn get_fval(&self) -> Option<f64> {
-        self.last_minimum.as_ref().map(|m| m.fval())
+        self.scan_fmin
+            .as_ref()
+            .map(|m| m.fval)
+            .or_else(|| self.last_minimum.as_ref().map(|m| m.fval()))
     }
 
     #[getter]
     fn get_valid(&self) -> Option<bool> {
-        self.last_minimum.as_ref().map(|m| m.is_valid())
+        self.scan_fmin
+            .as_ref()
+            .map(|m| m.is_valid)
+            .or_else(|| self.last_minimum.as_ref().map(|m| m.is_valid()))
     }
 
     #[getter]
     fn get_covariance(&self) -> Option<Vec<Vec<f64>>> {
-        if let Some(min) = &self.last_minimum
+        if self.scan_fmin.is_none()
+            && let Some(min) = &self.last_minimum
             && let Some(cov) = min.user_state().covariance()
         {
             let n = cov.nrow();
@@ -817,7 +827,9 @@ impl Minuit {
 
     #[getter]
     fn get_fmin(&self) -> Option<FMin> {
-        self.last_minimum.as_ref().map(FMin::from_minimum)
+        self.scan_fmin
+            .clone()
+            .or_else(|| self.last_minimum.as_ref().map(FMin::from_minimum))
     }
 
     #[getter]
@@ -857,7 +869,11 @@ impl Minuit {
 
     #[getter]
     fn get_nfcn(&self) -> usize {
-        self.last_minimum.as_ref().map(|m| m.nfcn()).unwrap_or(0)
+        self.scan_fmin
+            .as_ref()
+            .map(|m| m.nfcn)
+            .or_else(|| self.last_minimum.as_ref().map(|m| m.nfcn()))
+            .unwrap_or(0)
     }
 
     #[getter]
@@ -891,6 +907,7 @@ impl Minuit {
         slf.fixed = slf.init_fixed.clone();
         slf.limits = slf.init_limits.clone();
         slf.last_minimum = None;
+        slf.scan_fmin = None;
         slf.merrors.clear();
         slf.into()
     }
@@ -927,6 +944,7 @@ impl Minuit {
                 errordef: slf.errordef,
             };
             slf.merrors.clear();
+            slf.scan_fmin = None;
             let minimizer = slf.build_migrad();
             let result = minimizer.minimize(&fcn);
             slf.update_state_from_result(&result);
@@ -942,6 +960,7 @@ impl Minuit {
                 errordef: slf.errordef,
             };
             slf.merrors.clear();
+            slf.scan_fmin = None;
             let minimizer = slf.build_simplex();
             let result = minimizer.minimize(&fcn);
             slf.update_state_from_result(&result);
@@ -1287,11 +1306,136 @@ impl Minuit {
     }
 
     #[pyo3(signature = (ncall=None))]
-    fn scan(&self, ncall: Option<usize>) -> PyResult<()> {
-        let _ = ncall;
-        Err(PyNotImplementedError::new_err(
-            "scan (brute-force global minimizer) is not yet implemented; use profile/mnprofile for 1D scans",
-        ))
+    fn scan(
+        mut slf: PyRefMut<'_, Self>,
+        py: Python<'_>,
+        ncall: Option<usize>,
+    ) -> PyResult<Py<Minuit>> {
+        let nfit = slf.names.iter().filter(|n| !slf.fixed.contains(*n)).count();
+        let ncall = ncall
+            .or(slf.max_calls)
+            // iminuit's _migrad_maxcall heuristic: 200 + 100*nfit + 5*nfit^2
+            .unwrap_or(200 + 100 * nfit + 5 * nfit * nfit);
+        let nstep = if nfit == 0 {
+            1
+        } else {
+            ((ncall as f64).powf(1.0 / nfit as f64) as usize).max(1)
+        };
+        let fcn = PythonFCN {
+            fcn: slf.fcn.clone_ref(py),
+            errordef: slf.errordef,
+        };
+        let mut grids = Vec::with_capacity(slf.names.len());
+        for name in &slf.names {
+            let v = *slf.values.get(name).unwrap_or(&0.0);
+            if slf.fixed.contains(name) {
+                grids.push(vec![v]);
+                continue;
+            }
+            let e = slf.errors.get(name).copied().unwrap_or(0.1).abs();
+            let (lo, hi) = slf.limits.get(name).copied().unwrap_or((None, None));
+            let low = lo.unwrap_or(v - e);
+            let high = hi.unwrap_or(v + e);
+            let grid = if low == high || nstep == 1 {
+                vec![low]
+            } else {
+                // iminuit uses nstep = int(ncall ** (1 / nfit)) and evaluates
+                // np.linspace(low, high, nstep), including both boundaries.
+                (0..nstep)
+                    .map(|i| low + i as f64 * (high - low) / (nstep - 1) as f64)
+                    .collect()
+            };
+            grids.push(grid);
+        }
+        let mut point = vec![0.0; slf.names.len()];
+        let mut best = point.clone();
+        let mut best_f = f64::INFINITY;
+        let mut nfcn = 0usize;
+        fn run(
+            ipar: usize,
+            grids: &[Vec<f64>],
+            point: &mut [f64],
+            best: &mut Vec<f64>,
+            best_f: &mut f64,
+            nfcn: &mut usize,
+            fcn: &PythonFCN,
+        ) {
+            if ipar == grids.len() {
+                let f = fcn.value(point);
+                *nfcn += 1;
+                if f < *best_f {
+                    *best_f = f;
+                    best.clone_from_slice(point);
+                }
+            } else {
+                for &x in &grids[ipar] {
+                    point[ipar] = x;
+                    run(ipar + 1, grids, point, best, best_f, nfcn, fcn);
+                }
+            }
+        }
+        run(
+            0,
+            &grids,
+            &mut point,
+            &mut best,
+            &mut best_f,
+            &mut nfcn,
+            &fcn,
+        );
+        for (name, value) in slf.names.clone().into_iter().zip(best.iter().copied()) {
+            slf.values.insert(name, value);
+        }
+        let mut edm = 0.0;
+        for (i, name) in slf.names.iter().enumerate() {
+            if slf.fixed.contains(name) {
+                continue;
+            }
+            let step = slf.errors.get(name).copied().unwrap_or(0.1).abs().max(1.0) * 1e-4;
+            let mut lo = best.clone();
+            let mut hi = best.clone();
+            lo[i] -= step;
+            hi[i] += step;
+            if let Some((lower, upper)) = slf.limits.get(name).copied() {
+                if let Some(lower) = lower {
+                    lo[i] = lo[i].max(lower);
+                }
+                if let Some(upper) = upper {
+                    hi[i] = hi[i].min(upper);
+                }
+            }
+            if hi[i] == lo[i] {
+                continue;
+            }
+            let flo = fcn.value(&lo);
+            let fhi = fcn.value(&hi);
+            nfcn += 2;
+            let grad = (fhi - flo) / (hi[i] - lo[i]);
+            let hess = (fhi - 2.0 * best_f + flo) / (0.5 * (hi[i] - lo[i])).powi(2);
+            if hess.is_finite() && hess > 0.0 {
+                edm += 0.5 * grad * grad / hess;
+            } else {
+                edm = f64::INFINITY;
+                break;
+            }
+        }
+        let edm_goal = slf.tolerance * slf.errordef * 0.002;
+        let is_valid = edm <= edm_goal;
+        slf.last_minimum = None;
+        slf.scan_fmin = Some(FMin {
+            fval: best_f,
+            edm,
+            nfcn,
+            errordef: slf.errordef,
+            is_valid,
+            has_valid_parameters: true,
+            has_covariance: false,
+            has_made_posdef_covar: false,
+            is_above_max_edm: !is_valid,
+            has_reached_call_limit: false,
+        });
+        slf.merrors.clear();
+        Ok(slf.into())
     }
 }
 

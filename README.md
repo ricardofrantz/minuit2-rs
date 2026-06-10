@@ -532,8 +532,8 @@ Enabled with the `python` feature flag. Built with [PyO3](https://pyo3.rs/) (v0.
 
 The binding targets a measured `iminuit.Minuit`-compatible subset. The current
 claim is bounded by `python/compat/diff_iminuit.py` plus the Python runtime
-tests; deferred APIs include the brute-force global `scan`, `mncontour(cl=...)`
-confidence-level scaling, `grad`/`g2`/`hessian` constructor callbacks, Matrix
+tests; deferred APIs include `mncontour(cl=...)` confidence-level scaling,
+`grad`/`g2`/`hessian` constructor callbacks, Matrix
 helper methods, plotting/interactive helpers, `scipy`, and `iminuit.cost`.
 
 ```python

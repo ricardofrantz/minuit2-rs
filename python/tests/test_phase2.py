@@ -65,7 +65,30 @@ def test_contour_grid_shapes():
     assert fval2d.min() < fval2d[-1, -1]
 
 
-def test_scan_raises_not_implemented():
-    m = fitted()
-    with pytest.raises(NotImplementedError):
-        m.scan()
+def test_scan_finds_best_hypercube_point_from_bad_start():
+    m = Minuit(quad, x=-4.0, y=7.0)
+    m.errors["x"] = 6.0
+    m.errors["y"] = 6.0
+    m.scan(ncall=100)
+    try:
+        assert abs(m.values["x"] - 0.6666666667) < 1e-9
+        assert abs(m.values["y"] - 2.3333333333) < 1e-9
+        assert m.fval < 0.23
+    except AssertionError:
+        print("minuit2 scan values", m.values.to_dict(), "fval", m.fval)
+        raise
+
+
+def test_scan_uses_limits_and_includes_boundaries():
+    m = Minuit(quad, x=-4.0, y=7.0)
+    m.limits["x"] = (0.0, 2.0)
+    m.errors["y"] = 6.0
+    m.scan(ncall=100)
+    try:
+        assert abs(m.values["x"] - 0.8888888889) < 1e-9
+        assert abs(m.values["y"] - 2.3333333333) < 1e-9
+        assert m.fval < 0.13
+        assert m.covariance is None
+    except AssertionError:
+        print("minuit2 scan values", m.values.to_dict(), "fval", m.fval)
+        raise

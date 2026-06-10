@@ -43,3 +43,13 @@
 - AC4 tests + no regressions: PASS — cargo test --all-features 0 failures (re-ran); rosenbrock rows keep nfcn_rel 0.0071/0.093; only the 5 in-scope files changed.
 - Supervisor reservation: the waiver explains the iteration-0 seed accounting, but the TOTAL gap (5 vs 29 calls) implies ROOT also spends per-iteration gradient probes Rust skips; bead k5h (seed-phase parity audit) owns the deeper question — waiver's next-step clause points back to route (a) if quality ever degrades.
 - Follow-ups: none new (k5h already filed).
+
+## 2026-06-10 — minuit2-rs-uf5: Python Minuit.scan() — iminuit hypercube semantics (re-briefed)
+- COURSE CORRECTION: original bead said "wire to MnScanMinimizer"; verified iminuit 2.32.0 source — scan() is a pure-Python full-hypercube grid scan and its docstring deems MnScan unsuitable (1D sequential, fails on correlated params). Re-briefed to replicate iminuit's algorithm; MnScanMinimizer stays ROOT-parity surface only (bead comment + goal commit a4d4d65 carry the evidence).
+- AC1 scan(ncall=None) semantics: PASS — hypercube recursion, nstep=int(ncall^(1/nfit)), linspace incl. boundaries, limits-else-value±error per side, fixed pinned, covariance→None, EDM-based validity, chaining (migrad/simplex clear scan fmin).
+- AC2 ncall rule cited: PASS (comment at the grid code; supervisor touch-up: default heuristic now uses nfit per iminuit _migrad_maxcall, was npar).
+- AC3 differential harness: PASS — re-ran: PASS=29 incl. scan_quadratic_bad_start + scan_bounded_parameter vs real iminuit.
+- AC4 behavior tests: PASS — pytest 12 passed; NotImplementedError test replaced, failures log both libs' values.
+- AC5 README deferred list: PASS — scan removed.
+- AC6 Rust suite: PASS — cargo test --all-features 0 failures, clippy clean (re-ran after touch-up).
+- Follow-ups: hesse()/minos() after scan() returns None-minimum path (iminuit allows hesse after scan) — minor drop-in edge, not harness-covered; consider in a future binding-parity bead.
