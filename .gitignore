@@ -15,3 +15,5 @@ __pycache__/
 
 # Local maturin/PyO3 build outputs
 python/minuit2/*.so
+.beads/
+.sc/
