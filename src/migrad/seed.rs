@@ -29,7 +29,7 @@ impl MigradSeedGenerator {
         strategy: &MnStrategy,
     ) -> MinimumSeed {
         let n = trafo.variable_parameters();
-        let eps2 = trafo.precision().eps2();
+        let eps = trafo.precision().eps();
 
         // 1. Get initial internal parameter values
         let int_values = trafo.initial_internal_values();
@@ -47,30 +47,20 @@ impl MigradSeedGenerator {
         let numerical_calc = Numerical2PGradientCalculator::new(*strategy);
         let gradient = numerical_calc.compute(fcn, &params, trafo, &heuristic_grad);
 
-        // Escape from bound-singular points where g2 <= 0 (internal Jacobian = 0).
-        // Only triggers when some g2[i] <= 0; is a complete no-op otherwise.
-        let (params, gradient) = if gradient.g2().iter().any(|&g2| g2 <= 0.0) {
+        // ROOT NegativeG2LineSearch is a seed-only repair: when a diagonal
+        // second derivative is non-positive, line-search along that coordinate
+        // and recompute all gradients before building the initial covariance.
+        let had_negative_g2 = has_negative_g2(&gradient);
+        let (params, gradient) = if had_negative_g2 {
             escape_negative_curvature(fcn, params, gradient, trafo, strategy)
         } else {
             (params, gradient)
         };
 
-        // 5. Build V₀ = diag(1/g2_i), fallback to 1.0 for non-positive g2
-        let mut v0 = DMatrix::zeros(n, n);
-        for i in 0..n {
-            let g2i = gradient.g2()[i];
-            v0[(i, i)] = if g2i > eps2 { 1.0 / g2i } else { 1.0 };
-        }
-
-        let dcovar = 1.0; // approximate: initial V is rough
-        let error = MinimumError::new(v0, dcovar);
-
-        // 6. EDM = 0.5 * g^T * V * g
-        let edm = {
-            let g = gradient.grad();
-            let e = error.matrix();
-            0.5 * g.dot(&(e * g))
-        };
+        // 5. Build V₀. ROOT's ordinary MnSeedGenerator site uses positive
+        // fallback for non-positive G2; the post-NegativeG2LineSearch rebuild
+        // keeps signed 1/G2 when |G2| is significant.
+        let (error, edm) = build_seed_error_and_edm(&gradient, n, eps, had_negative_g2);
 
         let state = MinimumState::new(params, error, gradient, edm, fcn.num_of_calls());
 
@@ -84,7 +74,7 @@ impl MigradSeedGenerator {
         _strategy: &MnStrategy,
     ) -> MinimumSeed {
         let n = trafo.variable_parameters();
-        let eps2 = trafo.precision().eps2();
+        let eps = trafo.precision().eps();
 
         // 1. Get initial internal parameter values
         let int_values = trafo.initial_internal_values();
@@ -97,26 +87,25 @@ impl MigradSeedGenerator {
         // 3. Compute analytical gradient (user-provided, with g2/gstep heuristics)
         let gradient = AnalyticalGradientCalculator::compute(fcn, trafo, &params);
 
-        // 4. Build V₀ = diag(1/g2_i), fallback to 1.0 for non-positive g2
-        let mut v0 = DMatrix::zeros(n, n);
-        for i in 0..n {
-            let g2i = gradient.g2()[i];
-            v0[(i, i)] = if g2i > eps2 { 1.0 / g2i } else { 1.0 };
-        }
-
-        let dcovar = 1.0; // approximate: initial V is rough
-        let error = MinimumError::new(v0, dcovar);
-
-        // 5. EDM = 0.5 * g^T * V * g
-        let edm = {
-            let g = gradient.grad();
-            let e = error.matrix();
-            0.5 * g.dot(&(e * g))
+        // ROOT also routes analytical-gradient seeds through NegativeG2LineSearch
+        // when the gradient calculator supplies non-positive G2 values.  In this
+        // Rust implementation AnalyticalGradientCalculator currently synthesizes
+        // positive G2 heuristics, so this is normally a no-op; keep the guard for
+        // traceability if custom G2 support is added later.
+        let had_negative_g2 = has_negative_g2(&gradient);
+        let (params, gradient, nfcn) = if had_negative_g2 {
+            escape_negative_curvature_analytical(fcn, params, gradient, trafo)
+        } else {
+            (params, gradient, 1)
         };
 
-        // Note: no MnFcn call counter here since analytical gradient doesn't eval FCN
-        // We'll use state with nfcn=1 (for the initial FCN eval only)
-        let state = MinimumState::new(params, error, gradient, edm, 1);
+        // 4. Build V₀ using the same ordinary-vs-post-NG2LS split as the
+        // numerical seed path.
+        let (error, edm) = build_seed_error_and_edm(&gradient, n, eps, had_negative_g2);
+
+        // Note: analytical-gradient seeding counts the initial FCN evaluation;
+        // any NegativeG2 line-search evaluations are included in `nfcn`.
+        let state = MinimumState::new(params, error, gradient, edm, nfcn);
 
         MinimumSeed::new(state, trafo.clone())
     }
@@ -130,49 +119,156 @@ impl MigradSeedGenerator {
     }
 }
 
+fn has_negative_g2(gradient: &FunctionGradient) -> bool {
+    gradient.g2().iter().any(|&g2| g2 <= 0.0)
+}
+
+fn build_seed_error_and_edm(
+    gradient: &FunctionGradient,
+    n: usize,
+    eps: f64,
+    signed_negative_g2_rebuild: bool,
+) -> (MinimumError, f64) {
+    let mut v0 = DMatrix::zeros(n, n);
+    for i in 0..n {
+        let g2i = gradient.g2()[i];
+        v0[(i, i)] = if signed_negative_g2_rebuild {
+            if g2i.abs() > eps {
+                1.0 / g2i
+            } else {
+                1.0
+            }
+        } else if g2i > eps {
+            1.0 / g2i
+        } else {
+            1.0
+        };
+    }
+
+    let mut error = MinimumError::new(v0, 1.0);
+    let edm = {
+        let g = gradient.grad();
+        let e = error.matrix();
+        0.5 * g.dot(&(e * g))
+    };
+
+    if signed_negative_g2_rebuild && edm < 0.0 {
+        error.set_invert_failed(true);
+    }
+
+    (error, edm)
+}
+
+fn is_at_zero_jacobian_limit(
+    trafo: &MnUserTransformation,
+    params: &MinimumParameters,
+    int_idx: usize,
+) -> bool {
+    let ext_idx = trafo.ext_of_int(int_idx);
+    let parameter = trafo.parameter(ext_idx);
+    (parameter.has_lower_limit() || parameter.has_upper_limit())
+        && trafo.dint2ext(ext_idx, params.vec()[int_idx]).abs() < trafo.precision().eps2()
+}
+
 fn escape_negative_curvature(
+    fcn: &MnFcn,
+    params: MinimumParameters,
+    gradient: FunctionGradient,
+    trafo: &MnUserTransformation,
+    strategy: &MnStrategy,
+) -> (MinimumParameters, FunctionGradient) {
+    let mut recompute_gradient = |params: &MinimumParameters, previous: &FunctionGradient| {
+        Numerical2PGradientCalculator::new(*strategy).compute(fcn, params, trafo, previous)
+    };
+    escape_negative_curvature_with(fcn, params, gradient, trafo, true, &mut recompute_gradient)
+}
+
+fn escape_negative_curvature_analytical(
+    fcn: &dyn FCNGradient,
+    params: MinimumParameters,
+    gradient: FunctionGradient,
+    trafo: &MnUserTransformation,
+) -> (MinimumParameters, FunctionGradient, usize) {
+    let mn_fcn = MnFcn::new(fcn, trafo);
+    let mut recompute_gradient = |params: &MinimumParameters, _previous: &FunctionGradient| {
+        AnalyticalGradientCalculator::compute(fcn, trafo, params)
+    };
+    let (params, gradient) = escape_negative_curvature_with(
+        &mn_fcn,
+        params,
+        gradient,
+        trafo,
+        false,
+        &mut recompute_gradient,
+    );
+    (params, gradient, 1 + mn_fcn.num_of_calls())
+}
+
+fn escape_negative_curvature_with(
     fcn: &MnFcn,
     mut params: MinimumParameters,
     mut gradient: FunctionGradient,
     trafo: &MnUserTransformation,
-    strategy: &MnStrategy,
+    has_gstep: bool,
+    recompute_gradient: &mut impl FnMut(&MinimumParameters, &FunctionGradient) -> FunctionGradient,
 ) -> (MinimumParameters, FunctionGradient) {
     let n = gradient.g2().len();
-    let max_iters = 2 * n + 2;
+    let mut iter = 0usize;
 
-    for _ in 0..max_iters {
-        if !gradient.g2().iter().any(|&g2| g2 <= 0.0) {
-            break;
-        }
+    // Mirrors ROOT NegativeG2LineSearch.cxx:62-123 (v6-36-08): repair one
+    // offending coordinate per pass, then recompute the full gradient before
+    // scanning again. Rust permits one extra pass to preserve the established
+    // start-at-limit escape regression at zero-Jacobian transform singularities.
+    loop {
+        let mut iterate = false;
 
-        let step_floor = trafo.precision().eps2().sqrt();
-        let mut step = DVector::zeros(n);
         for i in 0..n {
             if gradient.g2()[i] <= 0.0 {
-                let gi = gradient.grad()[i];
-                let gstepi = gradient.gstep()[i].abs().max(step_floor);
-                // Move opposite to gradient to descend; for gi==0, probe in positive direction.
-                step[i] = if gi > 0.0 { -gstepi } else { gstepi };
+                let mut step = DVector::zeros(n);
+                let gstep = if has_gstep { gradient.gstep()[i] } else { 1.0 };
+                let zero_grad = gradient.grad()[i].abs() < trafo.precision().eps();
+                let zero_g2 = gradient.g2()[i].abs() < trafo.precision().eps();
+                let zero_gstep = gstep.abs() < trafo.precision().eps();
+                if zero_grad && zero_g2 && zero_gstep {
+                    continue;
+                }
+
+                let at_limit = is_at_zero_jacobian_limit(trafo, &params, i);
+                step[i] = if zero_grad && at_limit {
+                    // Waived branch: ROOT skips the exact zero-gradient,
+                    // zero-Jacobian limit singularity and therefore defines no
+                    // direction there. Keep Rust's documented start-at-limit
+                    // escape direction; use a finite internal probe so the seed
+                    // has enough curvature information not to converge at the
+                    // transform singularity.
+                    gstep.abs().max(1.0)
+                } else if zero_grad && zero_g2 {
+                    // Same ROOT-skipped branch away from a detected transform
+                    // singularity: preserve the established positive probe.
+                    gstep
+                } else if gradient.grad()[i] < 0.0 {
+                    gstep
+                } else {
+                    -gstep
+                };
+
+                let gdel = step[i] * gradient.grad()[i];
+                let ls = mn_linesearch(fcn, &params, &step, gdel, trafo.precision());
+
+                let actual_step = ls.x * &step;
+                params =
+                    MinimumParameters::with_step(params.vec() + &actual_step, actual_step, ls.y);
+                gradient = recompute_gradient(&params, &gradient);
+
+                iterate = true;
+                break;
             }
         }
 
-        if step.iter().all(|&s| s == 0.0) {
+        if !(iter < 2 * n + 1 && iterate) {
             break;
         }
-
-        let gdel = step.dot(gradient.grad());
-        let ls = mn_linesearch(fcn, &params, &step, gdel, trafo.precision());
-
-        if ls.x == 0.0 {
-            break;
-        }
-
-        let new_vec = params.vec() + ls.x * &step;
-        let actual_step = ls.x * &step;
-        params = MinimumParameters::with_step(new_vec, actual_step, ls.y);
-
-        let new_calc = Numerical2PGradientCalculator::new(*strategy);
-        gradient = new_calc.compute(fcn, &params, trafo, &gradient);
+        iter += 1;
     }
 
     (params, gradient)

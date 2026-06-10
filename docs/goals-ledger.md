@@ -53,3 +53,12 @@
 - AC5 README deferred list: PASS — scan removed.
 - AC6 Rust suite: PASS — cargo test --all-features 0 failures, clippy clean (re-ran after touch-up).
 - Follow-ups: hesse()/minos() after scan() returns None-minimum path (iminuit allows hesse after scan) — minor drop-in edge, not harness-covered; consider in a future binding-parity bead.
+
+## 2026-06-10 — minuit2-rs-k5h: Seed-phase parity audit vs ROOT NegativeG2LineSearch
+- AC1 findings table (reports/parity/negative_g2_audit.md, ROOT file:line cited): PASS — key result: ROOT v6-36-08 has NO in-iteration NegativeG2LineSearch call (VariableMetricBuilder uses MnPosDef only), so builder.rs correctly untouched; seed-phase had 3 genuine gaps, all fixed.
+- AC2 regression fails pre-change: PASS — supervisor-proved by stashing seed.rs: tests/negative_g2.rs FAILED (0 passed; 1 failed) on pre-change, passes post-change. Drives public MigradSeedGenerator::generate.
+- AC3 intentional gaps waived: PASS — start-at-limit waiver extended to cover escape direction (+probe) at the zero-Jacobian singularity ROOT skips (NegativeG2LineSearch.cxx:68-71); analytical-G2 seed gap documented (needs src/gradient/analytical.rs, out of scope).
+- AC4 gates: PASS (re-ran all myself) — quick gate exit 0, cargo test --all-features 0 failures, clippy clean, differential pass=12 warn=0 fail=0 (diff_results.csv unchanged), executed-surface gate PASS (P0=0 P1=48 P2=425 = baseline).
+- Fixes landed: per-coordinate repair + full-gradient recompute (was all-coords vector step, NegativeG2LineSearch.cxx:62-123); ROOT step direction -gstep for grad>=0 in ROOT-reachable branch (cxx:80-83); signed 1/G2 covariance rebuild + EDM<0 not-posdef flag at the NG2LS site only (cxx:125-140).
+- Cycle notes: 2 fix rounds. Round 1 coder BLOCKED on cargo-llvm-cov (known env gap, still open) + clang++ probe false-alarmed executed-surface gate (ABI symbol drift); Codex review found the 3 real gaps. Round 2 stop condition fired correctly on F1 vs limit_boundary; resolved by branch split (ROOT direction where ROOT executes, waived direction where ROOT skips).
+- Follow-ups: none new (cargo-llvm-cov install remains a standing user decision from 9ma).
