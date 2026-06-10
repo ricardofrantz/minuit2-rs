@@ -17,3 +17,12 @@
 - AC5 cargo test --all-features green (re-ran: 0 failures), clippy clean (re-ran), differential outputs untouched: PASS
 - Note: line-by-line fidelity to ScanBuilder.cxx not differentially verified (optional path not taken); structure matches ROOT (SimplexSeedGenerator composition, 41-point grid, ±2σ clamped to limits, sequential updates). Bead uf5's iminuit harness scan checks will validate behavior against the C++-backed iminuit.
 - Follow-ups: none.
+
+## 2026-06-10 — minuit2-rs-aic: NIST hard-dataset baseline
+- AC1 baseline script, 4 datasets x {iminuit,minuit2-rs} x {s1,s2}: PASS (re-ran myself, deterministic, 0.17 s)
+- AC2 shared python/compat/nist_models.py parsing committed .dat files: PASS (verified import + parser)
+- AC3 reports/parity/nist_hard_baseline.md matrix + per-dataset conclusions: PASS
+- AC4 genuine gap flagged at top: PASS — Hahn1 (iminuit s1 reaches certified, fval=1.53244; minuit2-rs valid=False both strategies)
+- AC5 deterministic, <5 min: PASS
+- Findings: Lanczos3 + MGH09 = parity failures (iminuit also fails from Start 2) → recipe targets. Hahn1 = GENUINE GAP → core investigation, likely seed/conditioning (relates to bead k5h). BoxBOD passes BOTH libs at 1e-2 from Start 2 — the skip note in tests/nist_strd_certified.rs appears stale; recipe bead should verify and possibly promote it to a plain oracle test.
+- Follow-ups: comments added to bead minuit2-rs-7qf (re-scope: Hahn1 core gap, BoxBOD promotion check).
