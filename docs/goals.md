@@ -1,64 +1,68 @@
-# Goal: Port ROOT ScanBuilder/ScanMinimizer (brute-force SCAn)   (bead: minuit2-rs-eoi)
+# Goal: NIST hard-dataset baseline (iminuit vs minuit2-rs)   (bead: minuit2-rs-aic)
 
 ## 1. Objective
-Add ROOT Minuit2's brute-force SCAn as a real minimizer in Rust (currently
-src/scan/ only has post-fit profile tools). VISION: robustness tool for bad
-starting points + foundation for the iminuit `Minuit.scan()` drop-in (wired in
-a separate later bead — NOT this one).
+Measure what upstream iminuit (its own vendored C++ Minuit2) actually does
+from NIST "Start 2" on the 4 unsolved StRD datasets (Lanczos3, BoxBOD, MGH09,
+Hahn1), side by side with minuit2-rs. This defines the honest pass bar for the
+multistart-recipe bead: parity vs genuine gap. (VISION: claims backed by
+evidence; "solves the hard problems the original solves".)
 
 ## 2. Acceptance Criteria
-- [ ] New scan minimizer in src/scan/ following the existing module pattern
-      (like src/simplex/: seed/builder/minimizer), behavior ported from ROOT
-      v6-36-08 ScanBuilder.cxx / ScanMinimizer.h (cite the C++ source in
-      comments like the rest of the codebase does).
-- [ ] Public builder API consistent with MnSimplex/MnMigrad: .add /
-      .add_limited / .with_strategy / .max_fcn / .minimize, exported from
-      src/lib.rs. Returns FunctionMinimum WITHOUT covariance (like Simplex);
-      validity semantics match ROOT's ScanBuilder.
-- [ ] New integration test file tests/scan_minimizer.rs: convergence on the
-      shared test functions (tests/common.rs quadratic; a bounded-param case;
-      a bad-start case showing improvement), detailed assertion messages.
-- [ ] Rustdoc on the public type stating when to use it (bad starts, pre-pass
-      before Migrad) and that Hesse must follow for errors.
-- [ ] cargo test --all-features green; clippy clean; existing differential
-      outputs untouched.
+- [ ] `scripts/nist_hard_baseline.py` (new) runs all 4 datasets through BOTH
+      iminuit.Minuit and minuit2.Minuit from Start 2, strategies 1 AND 2,
+      errordef=1, recording per run: valid flag, fval vs certified residual
+      SS, params within NIST tolerance (same tolerance scheme as
+      tests/nist_strd_certified.rs), NFCN.
+- [ ] Model residuals + Start 2 + certified values are read from ONE shared
+      Python module (new, e.g. python/compat/nist_models.py) — NOT duplicated
+      formulas; datasets parsed from examples/data/nist/*.dat where present
+      (download via scripts/fetch_scientific_demo_data.sh conventions if a
+      .dat is missing — ⚠️ ask first before adding new data files).
+- [ ] `reports/parity/nist_hard_baseline.md` (new): 4-row result matrix
+      (columns: iminuit s1, iminuit s2, minuit2-rs s1, minuit2-rs s2), plus a
+      one-paragraph conclusion per dataset: parity-failure (both fail) or
+      genuine gap (iminuit succeeds, we fail).
+- [ ] Any genuine-gap dataset is flagged at the top of the report as the
+      priority target for the recipe bead.
+- [ ] Script is deterministic and runs in <5 min.
 
 ## 3. Verification
-- Quick: export PATH="$HOME/.cargo/bin:$PATH" && cargo test --test scan_minimizer 2>&1 | tail -10
-- Quick: export PATH="$HOME/.cargo/bin:$PATH" && cargo clippy --all-features 2>&1 | tail -5
-- Full (logged): export PATH="$HOME/.cargo/bin:$PATH" && cargo test --all-features 2>&1 | tail -10
+- Env: python3 -m venv .venv-maturin (if missing) && . .venv-maturin/bin/activate &&
+  pip install maturin iminuit numpy pytest &&
+  PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 maturin develop --features python
+- Quick: . .venv-maturin/bin/activate && python scripts/nist_hard_baseline.py --dataset BoxBOD 2>&1 | tail -15
+- Full (logged): python scripts/nist_hard_baseline.py 2>&1 | tail -40 ; then the report file exists and matches the printed matrix.
 
 ## 4. Scope
-✅ ALWAYS: src/scan/ (new modules), src/lib.rs (export only),
-   tests/scan_minimizer.rs (new).
-⚠️ ASK FIRST: any change to existing minimizers or MnScan profile behavior;
-   any new dependency; adding a differential workload to tools/ref_runner_cpp.
-🚫 NEVER: README.md, CHANGELOG.md, python bindings, .github/, existing tests,
-   reports/.
+✅ ALWAYS: scripts/nist_hard_baseline.py (new), python/compat/nist_models.py
+   (new), reports/parity/nist_hard_baseline.md (new).
+⚠️ ASK FIRST: new data files under examples/data/; changes to
+   tests/nist_strd_certified.rs; pip packages beyond maturin/iminuit/numpy/pytest.
+🚫 NEVER: src/ (no Rust changes this cycle), README.md, CHANGELOG.md,
+   .github/, existing scripts.
 
 ## 5. Non-Goals / Constraints
-- NOT this cycle: Python Minuit.scan() wiring (bead minuit2-rs-uf5); README
-  docs (supervisor handles docs after the Python bead).
-- Keep the profile-tool MnScan and the new minimizer clearly distinct in
-  naming and rustdoc (0.5.0 had naming-confusion pain here).
-- Port behavior with the pinned ROOT source open: third_party checkout used by
-  scripts/build_root_reference_runner.sh, tag v6-36-08 — not master.
+- NOT this cycle: the multistart recipe itself (bead minuit2-rs-7qf); fixing
+  any divergence found.
+- Read-only comparison: do not tweak tolerances/strategies beyond the matrix.
+- ROOT-runner column is optional; iminuit IS the C++-backed comparator. Skip
+  ROOT if wiring it costs more than ~30 min — note the skip in the report.
 
 ## 6. Context Pointers
-- `br show minuit2-rs-eoi` — full background/reasoning; `VISION.md`.
-- Existing patterns: src/simplex/{seed,builder,minimizer}.rs, src/scan/mod.rs,
-  src/minimum/ (FunctionMinimum construction), tests/simplex.rs (test style).
-- ROOT reference: ScanBuilder.cxx, ScanMinimizer.h, MnScan.h at v6-36-08.
-- Skills: rust.
+- `br show minuit2-rs-aic` (incl. comments — venv setup note); `VISION.md`.
+- Start 2 values + certified params + tolerances: tests/nist_strd_certified.rs
+  (port them into nist_models.py verbatim, cite NIST dataset pages).
+- Data: examples/data/nist/ + examples/data/SHA256SUMS;
+  harness style: python/compat/diff_iminuit.py.
+- Skills: python.
 
 ## 7. Task Breakdown
-1. Read ScanBuilder.cxx at the pinned tag; map its loop to a Rust builder.
-2. Implement seed/builder/minimizer + public API; unit smoke.
-3. tests/scan_minimizer.rs (quadratic, bounded, bad-start) → quick gate.
-4. clippy + full test suite → full gate.
+1. nist_models.py with the 4 models (residual fn, start2, certified, tol).
+2. Baseline script: run matrix, print + write report.
+3. Run all 4; write conclusions; flag genuine gaps.
 
 ## 8. Stop Conditions
 - DONE when all Acceptance Criteria pass.
-- STOP and report if: a gate fails twice on the same cause, the pinned ROOT
-  source is unavailable locally, or matching ROOT validity semantics requires
-  touching shared minimum/state types (⚠️ ask first).
+- STOP and report if: iminuit cannot be installed in the venv, a dataset's
+  .dat file is missing (⚠️ gate), or results are non-deterministic across
+  two consecutive runs.
