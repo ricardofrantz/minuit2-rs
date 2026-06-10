@@ -5,6 +5,9 @@
 
 use nalgebra::DMatrix;
 
+#[cfg(feature = "trace")]
+use std::io::Write;
+
 use crate::fcn::FCNGradient;
 use crate::gradient::{AnalyticalGradientCalculator, Numerical2PGradientCalculator};
 use crate::linesearch::mn_linesearch;
@@ -18,6 +21,28 @@ use crate::posdef::make_pos_def;
 use crate::strategy::MnStrategy;
 
 pub struct VariableMetricBuilder;
+
+#[cfg(feature = "trace")]
+fn trace_iteration(iter: usize, nfcn: usize, fval: f64, edm: f64, lambda: f64, grad_norm: f64, dcovar: f64) {
+    let Ok(path) = std::env::var("MINUIT2_RS_TRACE_JSONL") else {
+        return;
+    };
+    if path.is_empty() {
+        return;
+    }
+    let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) else {
+        return;
+    };
+    let _ = writeln!(
+        file,
+        "{{\"runner\":\"minuit2-rs\",\"iter\":{},\"nfcn\":{},\"fval\":{:.17},\"edm\":{:.17},\"lambda\":{:.17},\"grad_norm\":{:.17},\"dcovar\":{:.17}}}",
+        iter, nfcn, fval, edm, lambda, grad_norm, dcovar
+    );
+}
+
+#[cfg(not(feature = "trace"))]
+#[inline]
+fn trace_iteration(_iter: usize, _nfcn: usize, _fval: f64, _edm: f64, _lambda: f64, _grad_norm: f64, _dcovar: f64) {}
 
 impl VariableMetricBuilder {
     /// Top-level Migrad minimization: run iterations, optionally re-seed on failure.
@@ -113,6 +138,7 @@ impl VariableMetricBuilder {
         let mut edm = seed.edm();
 
         let mut states = Vec::new();
+        let mut iter = 0usize;
 
         loop {
             // 1. Newton step: step = -V * grad
@@ -156,6 +182,15 @@ impl VariableMetricBuilder {
                     lambda * &current_step,
                     f_new,
                 );
+                trace_iteration(
+                    iter,
+                    fcn.num_of_calls(),
+                    f_new,
+                    edm,
+                    lambda,
+                    gradient.grad().norm(),
+                    current_error.dcovar(),
+                );
                 states.push(MinimumState::new(
                     new_params,
                     current_error.clone(),
@@ -193,6 +228,15 @@ impl VariableMetricBuilder {
             edm = 0.5 * new_g.dot(&(new_v * new_g));
             edm *= 1.0 + 3.0 * new_dcovar;
 
+            trace_iteration(
+                iter,
+                fcn.num_of_calls(),
+                new_params.fval(),
+                edm,
+                lambda,
+                new_gradient.grad().norm(),
+                new_dcovar,
+            );
             states.push(MinimumState::new(
                 new_params.clone(),
                 new_error.clone(),
@@ -209,6 +253,7 @@ impl VariableMetricBuilder {
                 break;
             }
 
+            iter += 1;
             params = new_params;
             error = new_error;
             gradient = new_gradient;

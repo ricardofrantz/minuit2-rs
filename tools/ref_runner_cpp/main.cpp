@@ -6,6 +6,9 @@
 #include <Minuit2/MnMinimize.h>
 #include <Minuit2/MnMigrad.h>
 #include <Minuit2/MnMinos.h>
+#include <Minuit2/MnTraceObject.h>
+#include <Minuit2/MinimumState.h>
+#include <Minuit2/ModularFunctionMinimizer.h>
 #include <Minuit2/MnScan.h>
 #include <Minuit2/MnSimplex.h>
 #include <Minuit2/MnStrategy.h>
@@ -14,6 +17,8 @@
 #include <Minuit2/MnUserParameters.h>
 
 #include <cstdlib>
+#include <cmath>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -33,9 +38,45 @@ using ROOT::Minuit2::MnSimplex;
 using ROOT::Minuit2::MnStrategy;
 using ROOT::Minuit2::MnUserCovariance;
 using ROOT::Minuit2::MnUserParameterState;
+using ROOT::Minuit2::MnTraceObject;
 using ROOT::Minuit2::MnUserParameters;
 
 namespace {
+
+class JsonlTraceObject final : public MnTraceObject {
+public:
+   explicit JsonlTraceObject(char const *path) : fOut(path, std::ios::out | std::ios::trunc) {}
+
+   void operator()(int iter, ROOT::Minuit2::MinimumState const &state) override
+   {
+      double grad_norm = 0.0;
+      auto const &grad = state.Gradient().Grad();
+      for (std::size_t i = 0; i < grad.size(); ++i) {
+         double const g = grad(i);
+         grad_norm += g * g;
+      }
+      grad_norm = std::sqrt(grad_norm);
+
+      fOut << "{\"runner\":\"root-minuit2\",\"iter\":" << iter << ",\"nfcn\":" << state.NFcn()
+           << ",\"fval\":" << std::setprecision(17) << state.Fval() << ",\"edm\":" << state.Edm()
+           << ",\"lambda\":null,\"grad_norm\":" << grad_norm << ",\"dcovar\":" << state.Error().Dcovar()
+           << "}\n";
+   }
+
+private:
+   std::ofstream fOut;
+};
+
+JsonlTraceObject *maybe_attach_trace(MnMigrad &migrad)
+{
+   char const *path = std::getenv("MINUIT2_ROOT_TRACE_JSONL");
+   if (path == nullptr || path[0] == '\0') {
+      return nullptr;
+   }
+   auto *trace = new JsonlTraceObject(path);
+   migrad.Minimizer().Builder().SetTraceObject(*trace);
+   return trace;
+}
 
 class Quadratic3 final : public FCNBase {
 public:
@@ -243,7 +284,9 @@ RunResult run_quadratic3_fixx_migrad()
    upar.Fix(0);
 
    MnMigrad migrad(fcn, upar);
+   JsonlTraceObject *trace = maybe_attach_trace(migrad);
    FunctionMinimum minimum = migrad();
+   delete trace;
 
    RunResult result;
    result.workload = "quadratic3_fixx_migrad";
@@ -281,7 +324,9 @@ RunResult run_rosenbrock2_migrad()
    upar.Add("y", 0.0, 0.1);
 
    MnMigrad migrad(fcn, upar);
+   JsonlTraceObject *trace = maybe_attach_trace(migrad);
    FunctionMinimum minimum = migrad();
+   delete trace;
 
    RunResult result;
    result.workload = "rosenbrock2_migrad";

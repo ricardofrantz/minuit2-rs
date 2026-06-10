@@ -47,6 +47,7 @@ proptest = "1.11"
 [features]
 parallel = ["rayon"]
 python = ["pyo3", "numpy"]
+trace = []
 
 [profile.release]
 lto = true
