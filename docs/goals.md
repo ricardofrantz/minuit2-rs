@@ -1,50 +1,61 @@
-# Goal: 7qf fix round — honest starts, tier tolerances, one grid (bead: minuit2-rs-7qf)
+# Goal: Hahn1 core divergence — diagnose, then fix with ROOT citation (bead: minuit2-rs-j2j)
 
 ## 1. Objective
-Your 7qf work is in the tree (do NOT revert). Review found the hard-tier oracle is
-weakened: the multistart anchors are rounded CERTIFIED values, so the test proves
-nothing about finding the solution. Fix the three findings; original ACs (goal
-commit 74ae336) still apply.
+iminuit (C++ Minuit2) reaches the certified Hahn1 solution from NIST Start 1
+(fval=1.53244, nfcn=581, strategy 1); minuit2-rs returns valid=False on BOTH
+strategies (s1 nfcn=72 fval=51623; s2 nfcn=260 fval=46950). Since iminuit IS
+ROOT Minuit2, a divergence this large is a parity gap somewhere in our chain.
+Diagnose the FIRST divergence point, then fix it if the mechanism is citable
+to ROOT source. Diagnosis before any fix — no tuning by trial.
 
-## 2. Acceptance Criteria (this round)
-- [ ] F1 HONEST STARTS: no anchor/grid point may be derived from certified values
-      (tests/nist_strd_certified.rs ~L579 and examples/nist_strd_hard.rs grids).
-      Allowed seeds: the NIST Start 1 / Start 2 vectors from the committed .dat
-      files, and deterministic transformations of THOSE (multiplicative grids,
-      sign variants, coarse log-space grids, Simplex/SCAn pre-pass results).
-      The recipe must genuinely travel from NIST starts to certified values.
-      If a dataset cannot reach certified this way within the runtime budget,
-      STOP and report with the best worst_rel achieved per start — do not
-      smuggle the answer into the seed.
-- [ ] F2 TIER TOLERANCES: use the same per-difficulty tolerance scheme as the
-      existing 8 plain datasets (check the existing tier mapping in this test
-      file; NIST marks Lanczos3 Lower and Hahn1 Average → 1e-3 if that is what
-      the existing scheme assigns). No hard-coded 1e-2 acceptance in hard_fit
-      when the tier says tighter.
-- [ ] F3 ONE GRID: the example and the test must use the IDENTICAL recipe
-      (starts, pre-pass, rescaling). Share or duplicate-with-sync-test —
-      certification in CI must be achieved by exactly the documented recipe.
-- [ ] Determinism double-run still holds; gates: `bash .sc/minuit2-rs-7qf.gate.sh`
-      green (clippy is --all-targets — examples are linted; no {:?} prints);
-      `cargo test --all-features` 0 failures; default wall-time not regressed.
+## 2. Acceptance Criteria
+- [ ] AC1 DIAGNOSIS: reports/parity/hahn1_core_divergence.md states (a) WHY
+      valid=False — which FunctionMinimum flag fires (above_max_edm? not
+      posdef? call limit?) at which iteration; (b) the first point where
+      minuit2-rs's trajectory diverges from iminuit's (seed? first gradient?
+      iteration N?) with side-by-side numbers; (c) the mechanism, citing the
+      ROOT Minuit2 file:line whose behavior we miss. Useful probes:
+      scripts/nist_hard_baseline.py (env: `. .venv-maturin/bin/activate`),
+      iminuit's per-iteration state via callbacks/prints, and our own trace
+      hooks (see scripts/diff_iteration_traces.py).
+- [ ] AC2 FIX (only if AC1 yields a ROOT-citable gap): implement the parity
+      fix in src/ with the ROOT file:line in comments; add a regression test
+      that FAILS pre-change (state the command proving it). Success target:
+      Hahn1 minuit2-rs reaches certified params from NIST Start 1 or 2 at the
+      baseline's 1e-2 tolerance — or, if it still cannot, prove iminuit's
+      success depends on behavior we correctly lack and STOP (that is AC1
+      output, not a failure).
+- [ ] AC3 NO REGRESSIONS: differential harness pass=12 warn=0 fail=0;
+      plain NIST tier 9 passed; hard tier (--ignored) still certifies;
+      regenerate reports/parity/nist_hard_baseline.md if any status changed.
+- [ ] AC4 GATES: `bash .sc/minuit2-rs-j2j.gate.sh` exit 0;
+      `cargo test --all-features` 0 failures; clippy --all-targets clean.
 
 ## 3. Verification
-`bash .sc/minuit2-rs-7qf.gate.sh` (plain tier, hard tier ×2, clippy --all-targets)
+`bash .sc/minuit2-rs-j2j.gate.sh`  (tests, clippy, differential harness,
+maturin rebuild + baseline rerun, NIST plain+hard tiers)
 
 ## 4. Scope
-✅ ALWAYS: tests/nist_strd_certified.rs, examples/nist_strd_hard.rs, README.md (Testing)
-⚠️ ASK FIRST: any src/ module; .github/workflows/ci.yml
-🚫 NEVER: core minimizer numerics; loosening any existing plain-tier tolerance
+✅ ALWAYS: reports/parity/, tests/, scripts/ probe additions,
+   src/ ONLY for a fix whose mechanism cites ROOT Minuit2 source
+⚠️ ASK FIRST: changing any convergence/tolerance constant without a ROOT
+   citation; touching verification/workloads/*.json (waivers); python/minuit2
+   binding semantics
+🚫 NEVER: weakening existing tests or tolerances; "fixing" Hahn1 by special-
+   casing the dataset or seeding from certified values
 
 ## 5. Context Pointers
-- `br show minuit2-rs-7qf`; reports/parity/nist_hard_baseline.md; the NIST .dat
-  files carry Start 1 / Start 2 (e.g. Lanczos3 Start 2 = [0.5, 0.7, 3.6, 4.2, 4, 6.3]).
-- Hahn1 rescaling (z = x/1000) stays — but its grid must seed from the NIST
-  starts mapped into q-space, not from certified q-values.
+- `br show minuit2-rs-j2j`; reports/parity/nist_hard_baseline.md (current rows)
+- Prior parity work: k5h = seed NegativeG2LineSearch (did NOT move Hahn1),
+  9ma = Numerical2PGradientCalculator parity. Suspect remaining areas: MnPosDef
+  in-iteration handling, line search (MnLineSearch.cxx), error updator details,
+  MnFcn call accounting — nfcn=72 for 7 params suggests early bailout.
+- Hahn1: 7-param rational poly, x in [60, 1000] — severe scaling; certified
+  fval=1.53244. Datasets parsed by python/compat/nist_models.py.
 - Skills: rust.
 
 ## 6. Stop Conditions
-- DONE when all criteria pass.
-- STOP and report if: any dataset cannot reach certified from honest starts
-  (report best per-start worst_rel — that is a real finding, not a failure);
-  a gate fails twice on the same cause.
+- DONE when AC1 + AC3 + AC4 pass, and AC2 either lands or is justified out.
+- STOP and report if: the mechanism is found but the fix touches an ask-first
+  item; no ROOT-citable mechanism after the trace comparison (report the
+  side-by-side trace as the finding); a gate fails twice on the same cause.
