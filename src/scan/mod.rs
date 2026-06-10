@@ -3,11 +3,88 @@
 //! Evaluates the function along one parameter direction, keeping others at
 //! their minimum values.
 
+pub mod builder;
+pub mod minimizer;
+pub mod seed;
+
+use crate::application::default_max_fcn;
 use crate::fcn::FCN;
 use crate::minimum::FunctionMinimum;
+use crate::mn_fcn::MnFcn;
+use crate::strategy::MnStrategy;
 use crate::user_parameters::MnUserParameters;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
+
+/// Builder for ROOT Minuit2's brute-force SCAn minimizer.
+///
+/// SCAn evaluates a coarse one-dimensional grid around the starting point for
+/// each variable parameter and keeps the best point found.  Use it as a robust
+/// pre-pass for bad starting values, often before running `MnMigrad`.  SCAn does
+/// not calculate parameter errors or a covariance matrix; run `MnHesse` after it
+/// when uncertainties are needed.
+pub struct MnScanMinimizer {
+    params: MnUserParameters,
+    strategy: MnStrategy,
+    max_fcn: Option<usize>,
+}
+
+impl MnScanMinimizer {
+    /// Create a new SCAn minimizer with default settings.
+    pub fn new() -> Self {
+        Self {
+            params: MnUserParameters::new(),
+            strategy: MnStrategy::default(),
+            max_fcn: None,
+        }
+    }
+
+    /// Set the optimization strategy level used for seed generation.
+    pub fn with_strategy(mut self, level: u32) -> Self {
+        self.strategy = MnStrategy::new(level);
+        self
+    }
+
+    /// Add a free parameter.
+    pub fn add(mut self, name: impl Into<String>, value: f64, error: f64) -> Self {
+        self.params.add(name, value, error);
+        self
+    }
+
+    /// Add a parameter with both bounds.
+    pub fn add_limited(
+        mut self,
+        name: impl Into<String>,
+        value: f64,
+        error: f64,
+        lower: f64,
+        upper: f64,
+    ) -> Self {
+        self.params.add_limited(name, value, error, lower, upper);
+        self
+    }
+
+    /// Set maximum number of function calls. Default = 200 + 100*n + 5*n^2.
+    pub fn max_fcn(mut self, max: usize) -> Self {
+        self.max_fcn = Some(max);
+        self
+    }
+
+    /// Run the SCAn minimization.
+    pub fn minimize(&self, fcn: &dyn FCN) -> FunctionMinimum {
+        let n = self.params.variable_parameters();
+        let max_fcn = self.max_fcn.unwrap_or_else(|| default_max_fcn(n));
+        let trafo = self.params.trafo().clone();
+        let mn_fcn = MnFcn::new(fcn, &trafo);
+        minimizer::ScanMinimizer::minimize(&mn_fcn, &trafo, &self.strategy, max_fcn)
+    }
+}
+
+impl Default for MnScanMinimizer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// Low-level 1D parameter scan.
 pub struct MnParameterScan<'a, F: FCN + ?Sized> {

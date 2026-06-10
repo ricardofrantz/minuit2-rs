@@ -79,7 +79,7 @@ pub use minimum::FunctionMinimum;
 pub use minos::MnMinos;
 pub use parameter::MinuitParameter;
 pub use precision::MnMachinePrecision;
-pub use scan::MnScan;
+pub use scan::{MnScan, MnScanMinimizer};
 pub use simplex::MnSimplex;
 pub use strategy::MnStrategy;
 pub use user_covariance::MnUserCovariance;
