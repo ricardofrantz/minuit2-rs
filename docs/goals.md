@@ -1,68 +1,58 @@
-# Goal: NIST hard-dataset baseline (iminuit vs minuit2-rs)   (bead: minuit2-rs-aic)
+# Goal: Close the Rosenbrock Migrad NFCN gap (+42% vs C++)   (bead: minuit2-rs-9ma)
 
 ## 1. Objective
-Measure what upstream iminuit (its own vendored C++ Minuit2) actually does
-from NIST "Start 2" on the 4 unsolved StRD datasets (Lanczos3, BoxBOD, MGH09,
-Hahn1), side by side with minuit2-rs. This defines the honest pass bar for the
-multistart-recipe bead: parity vs genuine gap. (VISION: claims backed by
-evidence; "solves the hard problems the original solves".)
+rosenbrock2_migrad: Rust spends 199 FCN calls where ROOT v6-36-08 spends 140.
+Diagnose with the iteration-trace diff tooling, find the mechanism, fix it.
+Numerics are already at parity — only the convergence path differs.
 
-## 2. Acceptance Criteria
-- [ ] `scripts/nist_hard_baseline.py` (new) runs all 4 datasets through BOTH
-      iminuit.Minuit and minuit2.Minuit from Start 2, strategies 1 AND 2,
-      errordef=1, recording per run: valid flag, fval vs certified residual
-      SS, params within NIST tolerance (same tolerance scheme as
-      tests/nist_strd_certified.rs), NFCN.
-- [ ] Model residuals + Start 2 + certified values are read from ONE shared
-      Python module (new, e.g. python/compat/nist_models.py) — NOT duplicated
-      formulas; datasets parsed from examples/data/nist/*.dat where present
-      (download via scripts/fetch_scientific_demo_data.sh conventions if a
-      .dat is missing — ⚠️ ask first before adding new data files).
-- [ ] `reports/parity/nist_hard_baseline.md` (new): 4-row result matrix
-      (columns: iminuit s1, iminuit s2, minuit2-rs s1, minuit2-rs s2), plus a
-      one-paragraph conclusion per dataset: parity-failure (both fail) or
-      genuine gap (iminuit succeeds, we fail).
-- [ ] Any genuine-gap dataset is flagged at the top of the report as the
-      priority target for the recipe bead.
-- [ ] Script is deterministic and runs in <5 min.
+## 2. Diagnosis head start (from the mhl cycle — verified)
+Divergence starts at ITERATION 0, i.e. the SEED phase: Rust seed nfcn 19 vs
+ROOT 9 on rosenbrock2. Start at src/migrad/seed.rs (and what it calls), NOT
+the builder loop. Traces already exist under reports/verification/raw/trace/
+(rosenbrock2_migrad.{root,rust}.jsonl); regenerate via feature `trace` +
+MINUIT2_RS_TRACE_JSONL and diff with scripts/diff_iteration_traces.py.
 
-## 3. Verification
-- Env: python3 -m venv .venv-maturin (if missing) && . .venv-maturin/bin/activate &&
-  pip install maturin iminuit numpy pytest &&
-  PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1 maturin develop --features python
-- Quick: . .venv-maturin/bin/activate && python scripts/nist_hard_baseline.py --dataset BoxBOD 2>&1 | tail -15
-- Full (logged): python scripts/nist_hard_baseline.py 2>&1 | tail -40 ; then the report file exists and matches the printed matrix.
+## 3. Acceptance Criteria
+- [ ] rosenbrock2_migrad NFCN rel diff vs ROOT ≤0.10 (ideally exact), with
+      fval/param/cov still passing in the differential harness.
+- [ ] Mechanism-based fix citing the ROOT source line(s) being mirrored —
+      no constant-tuning to luck into 140. If a residual delta is an
+      intentional non-replication, document the exact ROOT line + rationale.
+- [ ] No other workload regresses in diff_results.csv (pass stays pass;
+      the two fixx warns belong to bead b9e — don't touch them).
+- [ ] cargo test --all-features green incl. tests/nist_strd_certified.rs;
+      a regression test pins the new rosenbrock2 NFCN.
+- [ ] README "Pure Rust vs C++ Minuit2" NFCN table regenerated/updated.
 
-## 4. Scope
-✅ ALWAYS: scripts/nist_hard_baseline.py (new), python/compat/nist_models.py
-   (new), reports/parity/nist_hard_baseline.md (new).
-⚠️ ASK FIRST: new data files under examples/data/; changes to
-   tests/nist_strd_certified.rs; pip packages beyond maturin/iminuit/numpy/pytest.
-🚫 NEVER: src/ (no Rust changes this cycle), README.md, CHANGELOG.md,
-   .github/, existing scripts.
+## 4. Verification
+- Quick: export PATH="$HOME/.cargo/bin:$PATH" && cargo test --test root_reference_minuit2 --test migrad --test nist_strd_certified 2>&1 | tail -20
+- Full (logged): scripts/run_full_verification.sh v6-36-08 2>&1 | tail -30
+  then inspect rosenbrock rows + status counts in diff_results.csv.
 
-## 5. Non-Goals / Constraints
-- NOT this cycle: the multistart recipe itself (bead minuit2-rs-7qf); fixing
-  any divergence found.
-- Read-only comparison: do not tweak tolerances/strategies beyond the matrix.
-- ROOT-runner column is optional; iminuit IS the C++-backed comparator. Skip
-  ROOT if wiring it costs more than ~30 min — note the skip in the report.
+## 5. Scope
+✅ ALWAYS: src/migrad/seed.rs, src/migrad/builder.rs, src/linesearch.rs,
+   src/gradient/{initial,numerical}.rs, src/parabola.rs, tests/ (new
+   regression test), reports/verification/* (regenerated), README.md
+   (NFCN table only).
+⚠️ ASK FIRST: changes to src/hesse/, src/simplex/, src/minimum/, the trace
+   tooling itself, or any tolerance in existing tests.
+🚫 NEVER: CHANGELOG.md, .github/, python/, scripts/ (use them, don't edit).
 
-## 6. Context Pointers
-- `br show minuit2-rs-aic` (incl. comments — venv setup note); `VISION.md`.
-- Start 2 values + certified params + tolerances: tests/nist_strd_certified.rs
-  (port them into nist_models.py verbatim, cite NIST dataset pages).
-- Data: examples/data/nist/ + examples/data/SHA256SUMS;
-  harness style: python/compat/diff_iminuit.py.
-- Skills: python.
+## 6. Non-Goals / Constraints
+- The full seed-phase audit (escape_negative_curvature vs ROOT
+  NegativeG2LineSearch) is bead k5h — fix what closes THIS gap; if the root
+  cause turns out to be exactly that audit's subject, fix the rosenbrock
+  mechanism and note the rest for k5h, don't expand scope.
+- fixx warnings = bead b9e. Bit-identical 0.5.1 guarantee does NOT bind here;
+  fval/param/cov tolerance parity does.
 
-## 7. Task Breakdown
-1. nist_models.py with the 4 models (residual fn, start2, certified, tol).
-2. Baseline script: run matrix, print + write report.
-3. Run all 4; write conclusions; flag genuine gaps.
+## 7. Context Pointers
+- br show minuit2-rs-9ma (full background); VISION.md (item 2: ≤ C++ NFCN).
+- ROOT source mirror cited in existing file headers (v6-36-08).
+- C++ gotchas list: ~/.claude/.../MEMORY.md mirrored in module rustdoc.
 
 ## 8. Stop Conditions
 - DONE when all Acceptance Criteria pass.
-- STOP and report if: iminuit cannot be installed in the venv, a dataset's
-  .dat file is missing (⚠️ gate), or results are non-deterministic across
-  two consecutive runs.
+- STOP and report BLOCKED if: the mechanism requires an ⚠️ Ask-first file,
+  the gap cannot drop below 0.10 without constant-tuning, or any previously
+  passing workload regresses and the cause is not quickly attributable.
