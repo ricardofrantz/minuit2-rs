@@ -863,17 +863,17 @@ ROOT `v6-36-08` differential harness — the only apples-to-apples measurement):
 
 | Workload | C++ (ROOT) | Rust | Δ |
 |----------|-----------:|-----:|---|
-| Rosenbrock — Migrad | 140 | 199 | **+42% (Rust uses more)** |
-| Rosenbrock — Migrad, strategy 2 | 162 | 199 | +23% |
-| Quadratic, lower-limited — Migrad | 45 | 49 | +9% |
+| Rosenbrock — Migrad | 140 | 139 | −1% |
+| Rosenbrock — Migrad, strategy 2 | 162 | 147 | −9% |
+| Quadratic, lower-limited — Migrad | 45 | 33 | −27% |
 | Simplex | 19 | 19 | 0% |
 | Minos (p0) | 38 | 19 | −50% (Rust uses fewer) |
 | Quadratic (fixed param) — Hesse | 39 | 19 | fewer |
 | Quadratic (fixed param) — Migrad | 29 | 5 | fewer |
 
 The result is mixed, not uniformly slower: on the hard curved valley (Rosenbrock)
-the Rust DFP path currently spends ~40% more function evaluations than C++; on
-several other workloads it spends fewer or the same. These deltas come from small
+the Rust DFP path is now at ROOT call-count parity; on several other workloads it
+spends fewer or the same function evaluations. These deltas come from small
 convergence-path differences, not a different algorithm.
 
 **Wall-clock vs C++ is not benchmarked here.** Both are native compiled code doing
@@ -895,14 +895,15 @@ does not affect the function-evaluation comparison above.
 - **Drop-in `iminuit`-compatible Python API.**
 
 ### What you give up / pay
-- **Sometimes more function evaluations** on hard problems (Rosenbrock +42% above).
+- **Sometimes different function-evaluation counts** when small convergence-path
+  details differ from ROOT.
 - **Less field exposure** than 40+ years of MINUIT — a few ill-conditioned
   problems still trip it up; see [Testing](#testing): 4 NIST StRD datasets are not
   yet solved out of the box.
 - **No rigorous wall-clock benchmark vs C++** yet.
 
-In short: algorithmically equivalent and numerically validated against ROOT,
-occasionally less call-efficient on hard problems, in exchange for a
+In short: algorithmically equivalent and numerically validated against ROOT, with
+similar call efficiency in the differential harness, in exchange for a
 dependency-free, memory-safe, easy-to-embed pure-Rust library.
 
 ---

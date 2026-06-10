@@ -26,3 +26,12 @@
 - AC5 deterministic, <5 min: PASS
 - Findings: Lanczos3 + MGH09 = parity failures (iminuit also fails from Start 2) → recipe targets. Hahn1 = GENUINE GAP → core investigation, likely seed/conditioning (relates to bead k5h). BoxBOD passes BOTH libs at 1e-2 from Start 2 — the skip note in tests/nist_strd_certified.rs appears stale; recipe bead should verify and possibly promote it to a plain oracle test.
 - Follow-ups: comments added to bead minuit2-rs-7qf (re-scope: Hahn1 core gap, BoxBOD promotion check).
+
+## 2026-06-10 — minuit2-rs-9ma: Close the Rosenbrock Migrad NFCN gap
+- AC1 rosenbrock2_migrad nfcn_rel ≤0.10: PASS — 0.296 → 0.00714 (Rust 139 vs ROOT 140); strategy2 0.186 → 0.0926; fval/param/cov all pass.
+- AC2 mechanism-based fix: PASS — numerical.rs now mirrors Numerical2PGradientCalculator.cxx L54-151: epspri=eps2+|grd*eps2| curvature floor, vrysml=8*eps*eps, pre-evaluation step-convergence break, grad/g2/gstep seeded from previous gradient (not zeros). ROOT lines cited in module docs.
+- AC3 no status regressions: PASS — all 10 pass stay pass, fixx warns unchanged (b9e). Collateral NFCN shifts within pass: lower_limited 49→33 (now −27% vs ROOT), scan_p0 nfcn_rel 0→0.357.
+- AC4 tests green + regression pin: PASS — cargo test --all-features 0 failures (re-ran myself); new root_migrad_rosenbrock2_nfcn_stays_at_root_parity pins nfcn=139; clippy clean (re-ran).
+- AC5 README NFCN table: PASS — table + prose updated; "+42%" claim replaced with measured parity.
+- Note: coder exited BLOCKED (wrapper exit 4) solely on run_full_verification.sh's coverage step — cargo-llvm-cov not installed on this box (ask-first honored). diff_results.csv + all raw refs regenerated fine; ROOT ref JSONs shifted at ~1e-9 (runner rebuild), nfcn refs unchanged.
+- Follow-ups: env — install cargo-llvm-cov (user decision) so the full script's coverage tier runs; bead k5h (seed audit) remains relevant — divergence fixed here was the gradient calculator, not escape_negative_curvature.

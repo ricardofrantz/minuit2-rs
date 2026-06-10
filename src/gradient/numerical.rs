@@ -4,8 +4,11 @@
 //! `g_i = (f(x+h) - f(x-h)) / 2h`, with adaptive step
 //! sizing refined over multiple cycles. Also computes g2 (second derivative
 //! estimate) and gstep (optimal step size).
-
-use nalgebra::DVector;
+//!
+//! Mirrors ROOT v6-36-08 `Numerical2PGradientCalculator.cxx` lines 54-151:
+//! start from the supplied heuristic/previous gradient, include ROOT's
+//! `epspri = eps2 + abs(grd * eps2)` curvature floor, use `8*eps*eps` as the
+//! very-small step floor, and test step convergence before spending FCN calls.
 
 use crate::minimum::gradient::FunctionGradient;
 use crate::minimum::parameters::MinimumParameters;
@@ -32,19 +35,20 @@ impl Numerical2PGradientCalculator {
         initial_gradient: &FunctionGradient,
     ) -> FunctionGradient {
         let n = trafo.variable_parameters();
+        let eps = trafo.precision().eps();
         let eps2 = trafo.precision().eps2();
         let fcnmin = params.fval();
         let dfmin = 8.0 * eps2 * (fcnmin.abs() + fcn.up());
-        let vrysml = 8.0 * eps2 * eps2;
+        let vrysml = 8.0 * eps * eps;
 
         let x = params.vec();
         let ncycles = self.strategy.grad_ncycles();
         let step_tol = self.strategy.grad_step_tol();
         let grad_tol = self.strategy.grad_tol();
 
-        let mut grad = DVector::zeros(n);
-        let mut g2 = DVector::zeros(n);
-        let mut gstep = DVector::zeros(n);
+        let mut grad = initial_gradient.grad().clone();
+        let mut g2 = initial_gradient.g2().clone();
+        let mut gstep = initial_gradient.gstep().clone();
         let mut xp = x.clone();
         let mut xm = x.clone();
 
@@ -59,9 +63,11 @@ impl Numerical2PGradientCalculator {
             let mut g2i = initial_gradient.g2()[i];
 
             // Ncycles of refinement
+            let mut stepb4 = 0.0;
             for _cycle in 0..ncycles {
                 // Optimal step: balance truncation vs roundoff error
-                let optstp = (dfmin / (g2i.abs() + eps2)).sqrt();
+                let epspri = eps2 + (grad[i] * eps2).abs();
+                let optstp = (dfmin / (g2i.abs() + epspri)).sqrt();
                 let mut step = optstp.max(0.1 * gstepi.abs());
 
                 // Bounded parameter: cap step at 0.5
@@ -74,10 +80,12 @@ impl Numerical2PGradientCalculator {
                 let stpmin = vrysml.max(8.0 * eps2 * xi.abs());
                 step = step.clamp(stpmin, stpmax);
 
-                let stepb4 = gstepi;
-                let grdb4 = grad[i];
+                if ((step - stepb4) / step).abs() < step_tol {
+                    break;
+                }
 
                 gstepi = step;
+                stepb4 = step;
 
                 // Central differences: f(x+h) - f(x-h)
                 xp[i] = xi + step;
@@ -88,6 +96,7 @@ impl Numerical2PGradientCalculator {
                 xp[i] = xi;
                 xm[i] = xi;
 
+                let grdb4 = grad[i];
                 let grdi = 0.5 * (fp - fm) / step;
                 let g2i_new = (fp + fm - 2.0 * fcnmin) / (step * step);
 
@@ -96,18 +105,10 @@ impl Numerical2PGradientCalculator {
                 gstep[i] = gstepi;
                 g2i = g2i_new;
 
-                // Check convergence: step stabilization
-                if _cycle > 0 {
-                    let step_change = (gstepi - stepb4).abs() / gstepi.abs();
-                    if step_change < step_tol {
-                        break;
-                    }
-
-                    // Gradient stabilization
-                    let grad_change = (grdi - grdb4).abs() / (grdi.abs() + dfmin / step);
-                    if grad_change < grad_tol {
-                        break;
-                    }
+                // Check convergence: gradient stabilization
+                let grad_change = (grdi - grdb4).abs() / (grdi.abs() + dfmin / step);
+                if grad_change < grad_tol {
+                    break;
                 }
             }
         }
@@ -125,19 +126,20 @@ impl Numerical2PGradientCalculator {
         previous: &FunctionGradient,
     ) -> FunctionGradient {
         let n = trafo.variable_parameters();
+        let eps = trafo.precision().eps();
         let eps2 = trafo.precision().eps2();
         let fcnmin = params.fval();
         let dfmin = 8.0 * eps2 * (fcnmin.abs() + fcn.up());
-        let vrysml = 8.0 * eps2 * eps2;
+        let vrysml = 8.0 * eps * eps;
 
         let x = params.vec();
         let ncycles = self.strategy.grad_ncycles();
         let step_tol = self.strategy.grad_step_tol();
         let grad_tol = self.strategy.grad_tol();
 
-        let mut grad = DVector::zeros(n);
-        let mut g2 = DVector::zeros(n);
-        let mut gstep = DVector::zeros(n);
+        let mut grad = previous.grad().clone();
+        let mut g2 = previous.g2().clone();
+        let mut gstep = previous.gstep().clone();
         let mut xp = x.clone();
         let mut xm = x.clone();
 
@@ -151,8 +153,10 @@ impl Numerical2PGradientCalculator {
             let mut gstepi = previous.gstep()[i].max(vrysml);
             let mut g2i = previous.g2()[i];
 
+            let mut stepb4 = 0.0;
             for _cycle in 0..ncycles {
-                let optstp = (dfmin / (g2i.abs() + eps2)).sqrt();
+                let epspri = eps2 + (grad[i] * eps2).abs();
+                let optstp = (dfmin / (g2i.abs() + epspri)).sqrt();
                 let mut step = optstp.max(0.1 * gstepi.abs());
 
                 if has_limits {
@@ -163,10 +167,12 @@ impl Numerical2PGradientCalculator {
                 let stpmin = vrysml.max(8.0 * eps2 * xi.abs());
                 step = step.clamp(stpmin, stpmax);
 
-                let stepb4 = gstepi;
-                let grdb4 = grad[i];
+                if ((step - stepb4) / step).abs() < step_tol {
+                    break;
+                }
 
                 gstepi = step;
+                stepb4 = step;
 
                 xp[i] = xi + step;
                 xm[i] = xi - step;
@@ -176,6 +182,7 @@ impl Numerical2PGradientCalculator {
                 xp[i] = xi;
                 xm[i] = xi;
 
+                let grdb4 = grad[i];
                 let grdi = 0.5 * (fp - fm) / step;
                 let g2i_new = (fp + fm - 2.0 * fcnmin) / (step * step);
 
@@ -184,16 +191,9 @@ impl Numerical2PGradientCalculator {
                 gstep[i] = gstepi;
                 g2i = g2i_new;
 
-                if _cycle > 0 {
-                    let step_change = (gstepi - stepb4).abs() / gstepi.abs();
-                    if step_change < step_tol {
-                        break;
-                    }
-
-                    let grad_change = (grdi - grdb4).abs() / (grdi.abs() + dfmin / step);
-                    if grad_change < grad_tol {
-                        break;
-                    }
+                let grad_change = (grdi - grdb4).abs() / (grdi.abs() + dfmin / step);
+                if grad_change < grad_tol {
+                    break;
                 }
             }
         }
@@ -208,6 +208,7 @@ mod tests {
     use crate::fcn::FCN;
     use crate::parameter::MinuitParameter;
     use crate::user_transformation::MnUserTransformation;
+    use nalgebra::DVector;
 
     struct Quadratic;
     impl FCN for Quadratic {

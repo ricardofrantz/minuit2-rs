@@ -1,4 +1,4 @@
-use minuit2::{FCN, FCNGradient, MnHesse, MnMigrad, MnMinimize, MnSimplex};
+use minuit2::{FCNGradient, MnHesse, MnMigrad, MnMinimize, MnSimplex, FCN};
 use std::cell::Cell;
 
 /// Regression behavior checked against ROOT Minuit2 `math/minuit2/test/testMinuit2.cxx`:
@@ -217,6 +217,22 @@ fn root_minimize_reference_rosenbrock2() {
         "y mismatch: {}",
         params[1]
     );
+}
+
+/// Regression for the rosenbrock2 Migrad seed NFCN path against ROOT v6-36-08.
+/// ROOT takes 140 calls; the Rust path currently converges in 139 calls while
+/// preserving fval/parameter/covariance parity in the differential harness.
+#[test]
+fn root_migrad_rosenbrock2_nfcn_stays_at_root_parity() {
+    let f = Rosenbrock2;
+    let min = MnMigrad::new()
+        .add("x", 0.0, 0.1)
+        .add("y", 0.0, 0.1)
+        .tolerance(0.1)
+        .minimize(&f);
+
+    assert!(min.is_valid());
+    assert_eq!(min.nfcn(), 139);
 }
 
 /// Reference behavior for `NoG2CallsWhenFCHasNoG2`:
