@@ -1,46 +1,30 @@
-# Goal: Seed-phase parity audit — escape_negative_curvature vs ROOT NegativeG2LineSearch (bead: minuit2-rs-k5h)
+# Goal: k5h fix round — close 3 review findings on NegativeG2LineSearch parity (bead: minuit2-rs-k5h)
 
 ## 1. Objective
-Audit every call site and the internal algorithm of ROOT's NegativeG2LineSearch
-(pinned v6-36-08, commit a8ca1b23e38d7dbe0ff24027894ca0f2ad65f1bd) against our
-`escape_negative_curvature` in src/migrad/seed.rs and the Migrad builder loop;
-implement genuine gaps (e.g. mid-iteration negative-g2 handling) with regression
-tests, or document intentional differences with waiver rationale. VISION item 1
-(same numerics, divergences fixed or documented).
+Your previous k5h implementation is in the working tree (do NOT revert it).
+External review confirmed 3 parity defects against pinned ROOT v6-36-08
+(third_party/root_ref). Fix them; the original ACs (goal commit 793bcbe) still apply.
 
-## 2. Acceptance Criteria
-- [ ] Findings table at reports/parity/negative_g2_audit.md: call site | ROOT behavior | Rust behavior | gap? — covering MnSeedGenerator AND any in-iteration use (VariableMetricBuilder, MnApplication/minimize strategy retries) in v6-36-08.
-- [ ] Every genuine gap implemented has a regression test that FAILS on the pre-change code (state the pre-change failure output in the report).
-- [ ] Intentional gaps: rationale in the audit doc + verification/traceability/waiver_rules.csv if applicable.
-- [ ] Quick gate green; `cargo test --all-features` 0 failures; clippy clean.
-- [ ] If numerics changed: regenerate differential baselines via scripts/run_full_verification.sh v6-36-08; diff_summary must stay pass≥10 fail=0 (waived warns from b9e stay waived). If NO numerics changed, run it anyway and confirm diff_results.csv unmodified.
+## 2. Acceptance Criteria (this round)
+- [ ] F1 Zero-gradient step direction: src/migrad/seed.rs ~L213 uses `+gstep` when grad == 0; ROOT's else-branch (NegativeG2LineSearch.cxx:80-83) uses `-Gstep`/`-1` for grad >= 0. Match ROOT: only grad < 0 gets `+gstep`. If this breaks the start-at-limit regression (tests/limit_boundary.rs), STOP and report — do not weaken the test or silently re-extend the waiver.
+- [ ] F2 Post-escape covariance: ROOT rebuilds diag as SIGNED `1/G2` when `|G2| > prec.Eps()` (can be negative) and marks MnNotPosDef when EDM < 0 (NegativeG2LineSearch.cxx:125-140); Rust V0 build (seed.rs L59-66, L112-119) falls back to 1.0 for every non-positive g2. Check what ROOT MnSeedGenerator.cxx does at ITS V0 site vs what NG2LS does at its rebuild — match each site to its own ROOT form. If matching requires API changes beyond src/migrad/seed.rs (e.g. a not-posdef flag through MinimumError plumbing in other modules), do NOT implement — document it as an explicit remaining-gap row in the audit table with rationale, and say so in the report.
+- [ ] F3 Regression test must fail on PRE-change code: the current test calls the new `escape_negative_curvature_with` (wouldn't compile pre-change). Rewrite it to drive the public/pre-existing path (`escape_negative_curvature` or `MigradSeedGenerator::generate`) so the test file alone, applied to the pre-change tree, compiles and FAILS. Prove it: `git stash push src/migrad/seed.rs` is not possible per-hunk — instead, state the exact mechanism you used to demonstrate the pre-change failure and paste its real output into the audit doc (replace the current synthetic "pre-change equivalent failure" block).
+- [ ] Audit table rows updated to reflect F1-F3 outcomes (no row claims "implemented" while a known observable gap remains undocumented).
+- [ ] Gates: `bash .sc/minuit2-rs-k5h.gate.sh` green; `cargo test --all-features` 0 failures; `python3 scripts/compare_ref_vs_rust.py` stays pass=12 warn=0 fail=0; `python3 scripts/check_executed_surface_gate.py --mode non-regression` PASS. Skip coverage tooling entirely (known env gap — do not retry cargo-llvm-cov, do not use clang++ env hacks).
 
 ## 3. Verification
-Quick gate (both sides run): `bash .sc/minuit2-rs-k5h.gate.sh`
-Full (coder runs once, logs output in report): `scripts/run_full_verification.sh v6-36-08`
+`bash .sc/minuit2-rs-k5h.gate.sh && cargo test --all-features 2>&1 | tail -5 && python3 scripts/compare_ref_vs_rust.py 2>&1 | tail -3 && python3 scripts/check_executed_surface_gate.py --mode non-regression 2>&1 | tail -3`
 
 ## 4. Scope
-✅ ALWAYS: src/migrad/seed.rs, src/migrad/builder.rs (only if an in-iteration gap is confirmed), tests/negative_g2.rs (new) or tests/limit_boundary.rs, reports/parity/negative_g2_audit.md, verification/traceability/waiver_rules.csv
-⚠️ ASK FIRST: changes to any other src/ module; changing global diff thresholds or workload waivers
-🚫 NEVER: verification/workloads/*.json (except via the full script's regeneration), README NFCN table claims from 9ma
+✅ ALWAYS: src/migrad/seed.rs, reports/parity/negative_g2_audit.md, tests/negative_g2.rs (new, if you move the test there), verification/traceability/waiver_rules.csv
+⚠️ ASK FIRST: any other src/ module (incl. MinimumError plumbing — see F2), tests/limit_boundary.rs assertions
+🚫 NEVER: scripts/run_full_verification.sh coverage phases; global diff thresholds
 
-## 5. Non-Goals / Constraints
-- NOT this cycle: NIST multistart recipe (bead 7qf); performance work.
-- Audit against the PINNED checkout used by scripts/run_full_verification.sh (find its reference-source path inside the script) — never master. If the checkout lacks the two files, fetch NegativeG2LineSearch.{h,cxx} at the pinned commit and save under reports/verification/raw/ for citation.
-- Cite ROOT file:line for every row of the findings table.
-
-## 6. Context Pointers
-- `br show minuit2-rs-k5h` — full background (the 0.5.0 start-at-limit fix, INVENTORY.md status) and reasoning.
-- VISION.md; src/migrad/seed.rs (escape_negative_curvature), src/migrad/builder.rs (main loop), tests/limit_boundary.rs (test style to extend).
-- Prior ledger context: divergence fixed in 9ma was the gradient calculator, NOT escape_negative_curvature — the in-iteration question is still open.
+## 5. Context Pointers
+- `br show minuit2-rs-k5h`; VISION.md; third_party/root_ref/math/minuit2/src/NegativeG2LineSearch.cxx and MnSeedGenerator.cxx (pinned, never master).
+- The review findings above were independently verified by the supervisor against the pinned source — treat the ROOT line numbers as ground truth to re-check, not as instructions to follow blindly.
 - Skills: rust.
 
-## 7. Task Breakdown
-1. Locate pinned ROOT source; read NegativeG2LineSearch.{h,cxx} + grep all call sites → draft findings table.
-2. Diff each call site/algorithm step vs Rust → classify gap / parity / intentional.
-3. For each genuine gap: write the failing regression test first, then implement, cite ROOT lines in code comments.
-4. Run quick gate, full suite, full verification script → finalize report.
-
-## 8. Stop Conditions
-- DONE when all Acceptance Criteria pass.
-- STOP and report if: a gate fails twice on the same cause; an ⚠️ ASK-FIRST file needs touching; the pinned ROOT source cannot be located/fetched.
+## 6. Stop Conditions
+- DONE when all criteria pass.
+- STOP and report if: F1 breaks limit_boundary; F2 needs out-of-scope API changes (document-and-report path is acceptable); any gate fails twice on the same cause.
