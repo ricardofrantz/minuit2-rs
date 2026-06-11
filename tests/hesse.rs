@@ -69,6 +69,47 @@ fn hesse_rosenbrock_valid() {
     assert!(err_y > 0.01, "err_y should be positive, got {err_y}");
 }
 
+#[test]
+fn strategy2_migrad_returns_hesse_verified_covariance() {
+    let rosenbrock = |p: &[f64]| (1.0 - p[0]).powi(2) + 100.0 * (p[1] - p[0] * p[0]).powi(2);
+
+    let result = MnMigrad::new()
+        .add("x", -1.2, 0.2)
+        .add("y", 1.0, 0.2)
+        .with_strategy(2)
+        .max_fcn(100_000)
+        .minimize(&rosenbrock);
+
+    assert!(
+        result.is_valid(),
+        "strategy-2 Migrad should converge: fval={} edm={} nfcn={}",
+        result.fval(),
+        result.edm(),
+        result.nfcn()
+    );
+
+    let explicit = MnHesse::new()
+        .with_strategy(2)
+        .with_max_calls(100_000)
+        .calculate(&rosenbrock, &result);
+    assert!(explicit.is_valid());
+
+    let returned_cov = result.state().error().matrix();
+    let explicit_cov = explicit.state().error().matrix();
+    assert_eq!(returned_cov.shape(), explicit_cov.shape());
+    for i in 0..returned_cov.nrows() {
+        for j in 0..returned_cov.ncols() {
+            let got = returned_cov[(i, j)];
+            let want = explicit_cov[(i, j)];
+            let scale = want.abs().max(1.0);
+            assert!(
+                (got - want).abs() <= 2e-3 * scale,
+                "cov[{i},{j}] returned {got:.12e} vs explicit Hesse {want:.12e}"
+            );
+        }
+    }
+}
+
 /// Global correlations on correlated quadratic.
 #[test]
 fn hesse_global_correlations() {
@@ -117,5 +158,24 @@ fn hesse_calculate_errors() {
     assert!(
         (err_x - std::f64::consts::FRAC_1_SQRT_2).abs() < 0.05,
         "sigma_x should be ~0.707, got {err_x}"
+    );
+}
+
+#[test]
+fn hesse_flat_parameter_returns_failed_state_without_covariance() {
+    let minimum = MnMigrad::new()
+        .add("x", 2.0, 0.2)
+        .add("flat", 1.0, 0.2)
+        .minimize(&|p: &[f64]| p[0] * p[0]);
+
+    let hesse = MnHesse::new().calculate(&|p: &[f64]| p[0] * p[0], &minimum);
+
+    assert!(
+        !hesse.is_valid(),
+        "flat direction must not produce a valid Hesse covariance"
+    );
+    assert!(
+        !hesse.user_state().has_covariance(),
+        "failed Hesse state must not expose covariance"
     );
 }

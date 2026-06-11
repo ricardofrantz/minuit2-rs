@@ -9,7 +9,10 @@ fn quadratic_shared_smoke() {
         .add("y", -3.0, 1.5)
         .minimize(&|p: &[f64]| p[0] * p[0] + p[1] * p[1]);
 
-    assert!(result.is_valid(), "SCAn should produce a valid FunctionMinimum");
+    assert!(
+        result.is_valid(),
+        "SCAn should produce a valid FunctionMinimum"
+    );
     common::assert_function_minimum_display(&result, &["x", "y"]);
     assert!(
         result.fval() < result.seed().fval(),
@@ -34,7 +37,11 @@ fn bounded_parameter_case_respects_limits() {
     let x = result.params()[0];
     assert!((0.0..=4.0).contains(&x), "x={x} should stay inside [0, 4]");
     assert!((x - 3.0).abs() <= 0.05, "x should scan near 3.0, got {x}");
-    assert!(result.fval() <= 0.0026, "bounded scan fval should be small, got {}", result.fval());
+    assert!(
+        result.fval() <= 0.0026,
+        "bounded scan fval should be small, got {}",
+        result.fval()
+    );
 }
 
 #[test]

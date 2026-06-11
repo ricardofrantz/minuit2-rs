@@ -28,7 +28,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
-use minuit2::{MnHesse, MnMigrad, MnMinimize, FCN};
+use minuit2::{FCN, MnHesse, MnMigrad, MnMinimize};
 
 /// Resolve a path relative to the crate manifest directory.
 fn repo_path(rel: &str) -> PathBuf {

@@ -58,7 +58,8 @@ pub fn calculate(
     // --- Step 1: Diagonal Hessian elements ---
     let mut hessian_g2 = DVector::zeros(n);
     let mut hessian_gstep = DVector::zeros(n);
-    let mut hesse_failed = false;
+    let mut yy = DVector::zeros(n);
+    let hesse_failed = false;
 
     for i in 0..n {
         if fcn.num_of_calls() >= maxcalls {
@@ -71,20 +72,8 @@ pub fn calculate(
         let has_limits = p.has_limits() || p.has_lower_limit() || p.has_upper_limit();
 
         let dmin = 8.0 * eps2 * (xi.abs() + eps2);
-        let aimsag = (eps2).sqrt() * (amin.abs() + up);
-
-        // Start with current step or compute from g2
-        let mut d = if g2[i].abs() > eps2 {
-            (8.0 * aimsag / g2[i].abs()).sqrt().max(dmin)
-        } else {
-            dmin
-        };
-
-        // Bounded params: cap step at 0.5
-        if has_limits {
-            d = d.min(0.5);
-        }
-
+        let aimsag = eps2.sqrt() * (amin.abs() + up);
+        let mut d = gstep[i].abs().max(dmin);
         let mut g2i = g2[i];
 
         for _cycle in 0..ncycles as usize {
@@ -92,64 +81,88 @@ pub fn calculate(
                 break;
             }
 
-            let dlast = d;
-            let g2bfr = g2i;
+            let mut fp = 0.0;
+            let mut fm = 0.0;
+            let mut sag = 0.0;
+            let mut found_sag = false;
+            for _ in 0..5 {
+                let mut xp = x.clone();
+                let mut xm = x.clone();
+                xp[i] = xi + d;
+                xm[i] = xi - d;
 
-            // 5-point: evaluate at x+d and x-d
-            let mut xp = x.clone();
-            let mut xm = x.clone();
-            xp[i] = xi + d;
-            xm[i] = xi - d;
+                fp = fcn.call(xp.as_slice());
+                fm = fcn.call(xm.as_slice());
+                sag = 0.5 * (fp + fm - 2.0 * amin);
+                if sag != 0.0 {
+                    found_sag = true;
+                    break;
+                }
 
-            let fp = fcn.call(xp.as_slice());
-            let fm = fcn.call(xm.as_slice());
-
-            let sag = 0.5 * (fp + fm - 2.0 * amin);
-
-            if sag.abs() < eps2 {
-                // sag too small — increase step
-                if g2i < eps2 {
-                    // Hesse failed for this parameter — can't determine curvature
-                    hesse_failed = true;
+                if has_limits && d > 0.5 {
+                    break;
                 }
                 d *= 10.0;
-                if has_limits {
-                    d = d.min(0.5);
+                if has_limits && d > 0.5 {
+                    d = 0.51;
                 }
-                continue;
             }
 
+            if !found_sag {
+                // ROOT v6-36-08 math/minuit2/src/MnHesse.cxx:242-267:
+                // after all sag retries still yield zero curvature for a
+                // parameter, MnHesse immediately returns a MnHesseFailed
+                // diagonal state instead of continuing to off-diagonal terms.
+                let mut diag = DMatrix::zeros(n, n);
+                for j in 0..n {
+                    let tmp = if g2[j] < eps2 { 1.0 } else { 1.0 / g2[j] };
+                    diag[(j, j)] = if tmp < eps2 { 1.0 } else { tmp };
+                }
+                let mut error = MinimumError::new(diag, 1.0);
+                error.set_hesse_failed(true);
+                let failed_state = MinimumState::new(
+                    state.parameters().clone(),
+                    error,
+                    state.gradient().clone(),
+                    state.edm(),
+                    fcn.num_of_calls(),
+                );
+                return HesseResult {
+                    state: failed_state,
+                    hesse_failed: true,
+                    invert_failed: false,
+                    made_pos_def: false,
+                };
+            }
+
+            let dlast = d;
+            let g2bfr = g2i;
             g2i = 2.0 * sag / (d * d);
+            grad[i] = 0.5 * (fp - fm) / d;
+            gstep[i] = d;
+            yy[i] = fp;
 
-            // Update gradient estimate from same evaluations
-            let grdi = 0.5 * (fp - fm) / d;
-            grad[i] = grdi;
-
-            // Adaptive step from sag
-            d *= (aimsag / sag.abs()).sqrt();
-            d = d.max(dmin);
+            d = (2.0 * aimsag / g2i.abs()).sqrt();
             if has_limits {
                 d = d.min(0.5);
             }
+            d = d.max(dmin);
 
-            // Convergence check
-            if _cycle > 0 {
-                let d_change = (d - dlast).abs() / d;
-                let g2_change = (g2i - g2bfr).abs() / g2i.abs();
-                if d_change < hess_step_tol && g2_change < hess_g2_tol {
-                    break;
-                }
+            let d_change = ((d - dlast) / d).abs();
+            let g2_change = ((g2i - g2bfr) / g2i).abs();
+            if d_change < hess_step_tol || g2_change < hess_g2_tol {
+                break;
             }
+            d = d.min(10.0 * dlast).max(0.1 * dlast);
         }
 
         hessian_g2[i] = g2i;
-        hessian_gstep[i] = d;
+        hessian_gstep[i] = gstep[i];
         g2[i] = g2i;
-        gstep[i] = d;
     }
 
     // --- Step 2: Refine gradient using Hessian info (strategy > 0) ---
-    if strategy.strategy() > 0 && !hesse_failed {
+    if strategy.strategy() > 0 && !hesse_failed && grad.norm() > eps2 {
         let refined_grad = HessianGradientCalculator::compute(
             fcn,
             state.parameters(),
@@ -186,15 +199,7 @@ pub fn calculate(
             xpp[j] += dj;
             let fpp = fcn.call(xpp.as_slice());
 
-            let mut xpi = x.clone();
-            xpi[i] += di;
-            let fpi = fcn.call(xpi.as_slice());
-
-            let mut xpj = x.clone();
-            xpj[j] += dj;
-            let fpj = fcn.call(xpj.as_slice());
-
-            let cross = (fpp + amin - fpi - fpj) / (di * dj);
+            let cross = (fpp + amin - yy[i] - yy[j]) / (di * dj);
             hessian[(i, j)] = cross;
             hessian[(j, i)] = cross;
         }

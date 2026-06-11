@@ -37,16 +37,23 @@ impl VariableMetricMinimizer {
         // Run variable-metric iteration
         let states = VariableMetricBuilder::minimum(fcn, &seed, strategy, maxfcn, edmval);
 
-        // Check outcome
+        // Check outcome. ROOT evaluates convergence after the Hesse-verified
+        // continuation with the extended budget before reporting a call limit
+        // (VariableMetricBuilder.cxx:177-198); a valid state converged inside
+        // (maxfcn, 1.3*maxfcn] must therefore not be marked call-limited.
         let nfcn = fcn.num_of_calls();
-        if nfcn >= maxfcn {
-            FunctionMinimum::with_call_limit(seed, states, up)
-        } else if let Some(last) = states.last() {
-            if last.edm() > 10.0 * edmval {
+        if let Some(last) = states.last() {
+            if !last.error().is_valid() {
                 FunctionMinimum::above_max_edm(seed, states, up)
-            } else {
+            } else if last.edm() <= 10.0 * edmval {
                 FunctionMinimum::new(seed, states, up)
+            } else if nfcn >= maxfcn {
+                FunctionMinimum::with_call_limit(seed, states, up)
+            } else {
+                FunctionMinimum::above_max_edm(seed, states, up)
             }
+        } else if nfcn >= maxfcn {
+            FunctionMinimum::with_call_limit(seed, states, up)
         } else {
             FunctionMinimum::new(seed, states, up)
         }
@@ -80,16 +87,21 @@ impl VariableMetricMinimizer {
             &mn_fcn, fcn, &seed, strategy, maxfcn, edmval,
         );
 
-        // Check outcome
+        // Check outcome; see numerical-gradient path above for the ROOT
+        // continuation/call-limit ordering.
         let nfcn = mn_fcn.num_of_calls();
-        if nfcn >= maxfcn {
-            FunctionMinimum::with_call_limit(seed, states, up)
-        } else if let Some(last) = states.last() {
-            if last.edm() > 10.0 * edmval {
+        if let Some(last) = states.last() {
+            if !last.error().is_valid() {
                 FunctionMinimum::above_max_edm(seed, states, up)
-            } else {
+            } else if last.edm() <= 10.0 * edmval {
                 FunctionMinimum::new(seed, states, up)
+            } else if nfcn >= maxfcn {
+                FunctionMinimum::with_call_limit(seed, states, up)
+            } else {
+                FunctionMinimum::above_max_edm(seed, states, up)
             }
+        } else if nfcn >= maxfcn {
+            FunctionMinimum::with_call_limit(seed, states, up)
         } else {
             FunctionMinimum::new(seed, states, up)
         }

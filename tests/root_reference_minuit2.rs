@@ -1,4 +1,4 @@
-use minuit2::{FCNGradient, MnHesse, MnMigrad, MnMinimize, MnSimplex, FCN};
+use minuit2::{FCN, FCNGradient, MnHesse, MnMigrad, MnMinimize, MnSimplex};
 use std::cell::Cell;
 
 /// Regression behavior checked against ROOT Minuit2 `math/minuit2/test/testMinuit2.cxx`:
@@ -220,8 +220,8 @@ fn root_minimize_reference_rosenbrock2() {
 }
 
 /// Regression for the rosenbrock2 Migrad seed NFCN path against ROOT v6-36-08.
-/// ROOT takes 140 calls; the Rust path currently converges in 139 calls while
-/// preserving fval/parameter/covariance parity in the differential harness.
+/// ROOT's Hesse-verification loop appends the post-Hesse state for this
+/// strategy-1 fit; the Rust path now includes the same verification calls.
 #[test]
 fn root_migrad_rosenbrock2_nfcn_stays_at_root_parity() {
     let f = Rosenbrock2;
@@ -232,7 +232,38 @@ fn root_migrad_rosenbrock2_nfcn_stays_at_root_parity() {
         .minimize(&f);
 
     assert!(min.is_valid());
-    assert_eq!(min.nfcn(), 139);
+    assert_eq!(min.nfcn(), 152);
+}
+
+#[test]
+fn root_migrad_continuation_budget_does_not_report_call_limit_when_converged() {
+    let f = Rosenbrock2;
+    let maxfcn = 140;
+    let min = MnMigrad::new()
+        .add("x", 0.0, 0.1)
+        .add("y", 0.0, 0.1)
+        .max_fcn(maxfcn)
+        .tolerance(0.1)
+        .minimize(&f);
+
+    assert!(
+        min.nfcn() > maxfcn && min.nfcn() <= (1.3 * maxfcn as f64) as usize,
+        "regression must exercise the continuation window: nfcn={} maxfcn={}",
+        min.nfcn(),
+        maxfcn
+    );
+    assert!(
+        min.is_valid(),
+        "continuation-converged fit should be valid: nfcn={} call_limit={} above_edm={} edm={:.17e}",
+        min.nfcn(),
+        min.reached_call_limit(),
+        min.is_above_max_edm(),
+        min.edm()
+    );
+    assert!(
+        !min.reached_call_limit(),
+        "continuation-converged fit must not report call limit"
+    );
 }
 
 /// Reference behavior for `NoG2CallsWhenFCHasNoG2`:

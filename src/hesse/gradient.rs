@@ -65,7 +65,11 @@ impl HessianGradientCalculator {
 
                 let stpmax = 10.0 * gstepi.abs();
                 let stpmin = vrysml.max(8.0 * eps2 * xi.abs());
-                step = step.clamp(stpmin, stpmax);
+                step = if stpmax >= stpmin {
+                    step.clamp(stpmin, stpmax)
+                } else {
+                    stpmin
+                };
 
                 let stepb4 = gstepi;
                 let grdb4 = grad[i];

@@ -73,6 +73,10 @@ impl MnHesse {
         let mut states = minimum.states().to_vec();
         states.push(result.state);
 
+        if !states.last().is_some_and(|state| state.error().is_valid()) {
+            return FunctionMinimum::above_max_edm(minimum.seed().clone(), states, minimum.up());
+        }
+
         let mut min = FunctionMinimum::new(minimum.seed().clone(), states, minimum.up());
         // Update user state with covariance info
         let hesse_state = min.state();
@@ -102,6 +106,10 @@ impl MnHesse {
         let state = minimum.state();
 
         let result = calculator::calculate(&mn_fcn, state, trafo, &self.strategy, maxcalls);
+
+        if !result.state.error().is_valid() {
+            return minimum.user_state().clone();
+        }
 
         build_user_state_with_covariance(
             minimum,

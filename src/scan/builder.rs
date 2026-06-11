@@ -22,7 +22,8 @@ impl ScanBuilder {
 
         for i in 0..n {
             let ext = seed.trafo().ext_of_int(i);
-            if let Some((best_ext, best_fval)) = Self::scan_parameter(fcn, seed, ext, &mut external) {
+            if let Some((best_ext, best_fval)) = Self::scan_parameter(fcn, seed, ext, &mut external)
+            {
                 if best_fval < amin {
                     amin = best_fval;
                     external[ext] = best_ext;
@@ -32,8 +33,13 @@ impl ScanBuilder {
             dirin[i] = (2.0 * fcn.up() * seed.error().matrix()[(i, i)]).sqrt();
         }
 
-        let params = MinimumParameters::with_step(DVector::from_vec(x), DVector::from_vec(dirin), amin);
-        vec![MinimumState::from_params_edm(params, 0.0, fcn.num_of_calls())]
+        let params =
+            MinimumParameters::with_step(DVector::from_vec(x), DVector::from_vec(dirin), amin);
+        vec![MinimumState::from_params_edm(
+            params,
+            0.0,
+            fcn.num_of_calls(),
+        )]
     }
 
     fn scan_parameter(

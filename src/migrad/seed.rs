@@ -133,11 +133,7 @@ fn build_seed_error_and_edm(
     for i in 0..n {
         let g2i = gradient.g2()[i];
         v0[(i, i)] = if signed_negative_g2_rebuild {
-            if g2i.abs() > eps {
-                1.0 / g2i
-            } else {
-                1.0
-            }
+            if g2i.abs() > eps { 1.0 / g2i } else { 1.0 }
         } else if g2i > eps {
             1.0 / g2i
         } else {
