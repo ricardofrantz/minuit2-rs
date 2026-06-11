@@ -1,5 +1,7 @@
 # minuit2-rs
 
+![minuit2-rs banner](assets/readme-banner-v1.png)
+
 [![CI](https://github.com/ricardofrantz/minuit2-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/ricardofrantz/minuit2-rs/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/minuit2.svg)](https://crates.io/crates/minuit2)
 [![docs.rs](https://docs.rs/minuit2/badge.svg)](https://docs.rs/minuit2)
@@ -64,7 +66,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-minuit2 = "0.4"
+minuit2 = "0.5"
 ```
 
 Minimize the Rosenbrock function:
