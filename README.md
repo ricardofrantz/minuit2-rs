@@ -1,10 +1,12 @@
 # minuit2-rs
 
-![minuit2-rs banner](assets/readme-banner-v1.png)
+![minuit2-rs banner](assets/readme-banner-v2.png)
 
-[![CI](https://github.com/ricardofrantz/minuit2-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/ricardofrantz/minuit2-rs/actions/workflows/ci.yml)
-[![crates.io](https://img.shields.io/crates/v/minuit2.svg)](https://crates.io/crates/minuit2)
-[![docs.rs](https://docs.rs/minuit2/badge.svg)](https://docs.rs/minuit2)
+[![Crates.io](https://img.shields.io/crates/v/minuit2.svg)](https://crates.io/crates/minuit2)
+[![Documentation](https://docs.rs/minuit2/badge.svg)](https://docs.rs/minuit2)
+[![CI](https://github.com/ricardofrantz/minuit2-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/ricardofrantz/minuit2-rs/actions)
+[![MSRV](https://img.shields.io/badge/MSRV-1.85-blue.svg)](Cargo.toml)
+[![License](https://img.shields.io/badge/license-LGPL--2.1--or--later-blue.svg)](LICENSE)
 
 Pure Rust implementation of Minuit-style parameter optimization algorithms, tested against [ROOT Minuit2](https://github.com/root-project/root/tree/master/math/minuit2) as a numerical reference.
 
