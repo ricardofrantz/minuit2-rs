@@ -1,4 +1,4 @@
-![minuit2-rs banner](assets/readme-banner-v2.png)
+![minuit2-rs banner](https://raw.githubusercontent.com/ricardofrantz/minuit2-rs/main/assets/readme-banner-v2.png)
 
 [![Crates.io](https://img.shields.io/crates/v/minuit2.svg)](https://crates.io/crates/minuit2)
 [![Documentation](https://docs.rs/minuit2/badge.svg)](https://docs.rs/minuit2)
@@ -885,8 +885,9 @@ shortcut in the minimization itself.
 same-harness, in-process timing protocol (interleaved batches, trimmed medians,
 95% bootstrap CIs — see the figure in [Real-World Examples](#real-world-examples)
 and `examples/run_comparison.sh`). As of v0.5.2 on a Linux desktop the result is
-mixed: Rust is faster on USGS EQ (0.76×) and CERN dimuon (0.79×), and slower on
-NOAA CO2 (1.6×) and NIST StRD (2.6×). Per-call arithmetic is comparable native
+mixed: Rust is faster on USGS EQ (0.79×) and CERN dimuon (0.78×), and slower on
+NOAA CO2 (1.6×) and NIST StRD (2.6×). Runs are pinned to one core
+(`taskset`); a pinned and an unpinned run agree within the CIs. Per-call arithmetic is comparable native
 code; the gaps come from convergence-path and per-iteration overhead
 differences, not the algorithm.
 
