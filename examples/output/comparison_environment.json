@@ -1,24 +1,24 @@
 {
-  "timestamp_utc": "2026-05-12T07:18:31.587956+00:00",
-  "platform": "Linux-6.17.0-1010-azure-x86_64-with-glibc2.39",
+  "timestamp_utc": "2026-06-11T11:34:16.242775+00:00",
+  "platform": "Linux-7.0.0-22-generic-x86_64-with-glibc2.43",
   "system": "Linux",
-  "release": "6.17.0-1010-azure",
+  "release": "7.0.0-22-generic",
   "machine": "x86_64",
-  "python": "3.12.13",
+  "python": "3.14.4",
   "cpu_affinity": {
     "requested_core": null,
     "method": "none",
     "taskset_available": true
   },
   "linux": {
-    "cpu_model": "AMD EPYC 9V74 80-Core Processor",
+    "cpu_model": "AMD Ryzen 9 9900X 12-Core Processor",
     "governors": [],
     "intel_pstate_no_turbo": null
   },
   "loadavg": {
-    "1min": 11.13671875,
-    "5min": 3.11474609375,
-    "15min": 1.072265625
+    "1min": 2.0751953125,
+    "5min": 0.9423828125,
+    "15min": 0.77099609375
   },
   "benchmark_config": {
     "repeats_per_batch": 41,
