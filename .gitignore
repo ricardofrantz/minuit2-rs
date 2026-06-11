@@ -17,3 +17,10 @@ __pycache__/
 python/minuit2/*.so
 .beads/
 .sc/
+
+# Internal planning/process files — not part of the public repo
+VISION.md
+plan.md
+docs/goals.md
+docs/goals-ledger.md
+docs/improve-ledger.md

@@ -863,18 +863,20 @@ ROOT `v6-36-08` differential harness — the only apples-to-apples measurement):
 
 | Workload | C++ (ROOT) | Rust | Δ |
 |----------|-----------:|-----:|---|
-| Rosenbrock — Migrad | 140 | 139 | −1% |
-| Rosenbrock — Migrad, strategy 2 | 162 | 147 | −9% |
-| Quadratic, lower-limited — Migrad | 45 | 33 | −27% |
+| Rosenbrock — Migrad | 140 | 152 | +9% |
+| Rosenbrock — Migrad, strategy 2 | 162 | 160 | −1% |
+| Quadratic, lower-limited — Migrad | 45 | 46 | +2% |
 | Simplex | 19 | 19 | 0% |
-| Minos (p0) | 38 | 19 | −50% (Rust uses fewer) |
-| Quadratic (fixed param) — Hesse | 39 | 19 | fewer |
-| Quadratic (fixed param) — Migrad | 29 | 5 | fewer |
+| Minos (p0) | 38 | 13 | fewer (seed accounting, D-001) |
+| Quadratic (fixed param) — Hesse | 39 | 13 | fewer (seed accounting, D-001) |
+| Quadratic (fixed param) — Migrad | 29 | 20 | fewer (seed accounting, D-001) |
 
-The result is mixed, not uniformly slower: on the hard curved valley (Rosenbrock)
-the Rust DFP path is now at ROOT call-count parity; on several other workloads it
-spends fewer or the same function evaluations. These deltas come from small
-convergence-path differences, not a different algorithm.
+The minimization workloads land within about ±10% of ROOT's call counts. The
+v0.5.2 Hesse-verified convergence check spends extra verification calls on some
+fits (Rosenbrock strategy 1: +9%) and is what fixed the Hahn1 dataset. Where
+Rust spends notably fewer calls, the difference is a documented seed-phase
+accounting gap (D-001 in `reports/verification/known_differences.md`), not a
+shortcut in the minimization itself.
 
 **Wall-clock vs C++ is not benchmarked here.** Both are native compiled code doing
 the same arithmetic, so per-call cost is comparable — but a fair, same-harness
@@ -897,9 +899,10 @@ does not affect the function-evaluation comparison above.
 ### What you give up / pay
 - **Sometimes different function-evaluation counts** when small convergence-path
   details differ from ROOT.
-- **Less field exposure** than 40+ years of MINUIT — a few ill-conditioned
-  problems still trip it up; see [Testing](#testing): 4 NIST StRD datasets are not
-  yet solved out of the box.
+- **Less field exposure** than 40+ years of MINUIT. Two ill-conditioned NIST
+  StRD datasets (Lanczos3, MGH09) are not solved out of the box — though the
+  C++ original fails them from the same starting values too; see
+  [Testing](#testing).
 - **No rigorous wall-clock benchmark vs C++** yet.
 
 In short: algorithmically equivalent and numerically validated against ROOT, with
@@ -924,6 +927,9 @@ dependency-free, memory-safe, easy-to-embed pure-Rust library.
 | **Global Correlations** | Done | Global correlation coefficients from covariance |
 | **Covariance Squeeze** | Done | Remove parameter from covariance matrix |
 
+The project is feature-complete and in maintenance mode as of v0.5.2. No new
+features are planned; bug reports and correctness fixes are welcome.
+
 ---
 
 ## Testing
@@ -941,9 +947,12 @@ files — `cargo test --all-features`):
   hard-mode recipe in `examples/nist_strd_hard.rs` (NIST Start 1/Start 2-derived
   grids, a deterministic Lanczos3 profiled-LS pre-pass, Simplex pre-pass,
   Migrad+Hesse, and explicit Hahn1 user-model x rescaling).
-  See `reports/parity/nist_hard_baseline.md`: BoxBOD passes plain in both libs;
-  iminuit also fails Lanczos3 and MGH09 plain, while Hahn1 remains a filed core
-  divergence and is not claimed resolved by the recipe.
+  See `reports/parity/nist_hard_baseline.md`: BoxBOD passes plain in both libs,
+  and iminuit also fails Lanczos3 and MGH09 plain. The Hahn1 core divergence was
+  fixed in v0.5.2 (ROOT's Hesse-verified continuation, see CHANGELOG): plain
+  strategy-1 Migrad now reaches the certified Hahn1 solution from the NIST
+  starting values (`tests/hahn1_core_parity.rs`), and the recipe's explicit
+  rescaling is no longer required for it.
 - **Property-based metamorphic tests** (`tests/proptest_metamorphic.rs`) —
   randomized translation / scaling / permutation / start-point invariances via
   `proptest`; oracle-free, over many sampled inputs.
@@ -959,12 +968,13 @@ files — `cargo test --all-features`):
 
 This crate is verified against ROOT `v6-36-08` (`math/minuit2` subsystem only). Verification is automated and runs in CI.
 
-**Last generated verification snapshot in this checkout
-(`reports/verification/manifest.json`, generated 2026-02-11T13:57:34Z):**
+**Verification snapshot in this checkout** (differential counts from
+`reports/verification/diff_summary.md`, regenerated with v0.5.2; the
+traceability/coverage rows are from the full-run manifest of 2026-02-11):
 
 | Metric | Value |
 |--------|-------|
-| Differential workloads | 12 (pass=10, warn=2, fail=0) |
+| Differential workloads | 12 (pass=12, warn=0, fail=0) |
 | Traceability matrix | 415 symbols (implemented=303, waived=112, unresolved=0) |
 | Rust line coverage | 73% (no-default-features), 70% (all-features) |
 | Executed-surface gaps | P0=0, P1=48, P2=425 |
@@ -994,7 +1004,10 @@ scripts/run_full_verification.sh v6-36-08
 ### Known Gaps
 
 - Executed-surface strict gate fails (P1=48). See `reports/verification/executed_surface_mapping.md`.
-- NFCN divergence warnings in `quadratic3_fixx_migrad` and `quadratic3_fixx_hesse`.
+- NFCN accounting differences in `quadratic3_fixx_migrad` and
+  `quadratic3_fixx_hesse` are waived with a documented mechanism (D-001 in
+  `reports/verification/known_differences.md`): ROOT counts seed
+  central-difference probes that the Rust seed path does not perform.
 - Intentional architectural differences: `MnPrint` (logging reshaped in Rust), `MnMatrix` (replaced by nalgebra), `span.hxx`/`MPIProcess` (out of scope).
 
 ### P1 Concentration (prioritize burn-down here)
