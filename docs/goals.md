@@ -1,61 +1,62 @@
-# Goal: Hahn1 core divergence — diagnose, then fix with ROOT citation (bead: minuit2-rs-j2j)
+# Goal: j2j fix round — Hesse-verification loop parity edges (bead: minuit2-rs-j2j)
 
 ## 1. Objective
-iminuit (C++ Minuit2) reaches the certified Hahn1 solution from NIST Start 1
-(fval=1.53244, nfcn=581, strategy 1); minuit2-rs returns valid=False on BOTH
-strategies (s1 nfcn=72 fval=51623; s2 nfcn=260 fval=46950). Since iminuit IS
-ROOT Minuit2, a divergence this large is a parity gap somewhere in our chain.
-Diagnose the FIRST divergence point, then fix it if the mechanism is citable
-to ROOT source. Diagnosis before any fix — no tuning by trial.
+Your j2j Hahn1 fix is in the tree (do NOT revert). Review confirmed the
+mechanism, but the new Hesse-verification loop in src/migrad/builder.rs
+diverges from ROOT in 5 control-flow edge cases. Fix all 5; original ACs
+(goal commit daac3b2) still apply. All ROOT refs = third_party/root_ref.
 
-## 2. Acceptance Criteria
-- [ ] AC1 DIAGNOSIS: reports/parity/hahn1_core_divergence.md states (a) WHY
-      valid=False — which FunctionMinimum flag fires (above_max_edm? not
-      posdef? call limit?) at which iteration; (b) the first point where
-      minuit2-rs's trajectory diverges from iminuit's (seed? first gradient?
-      iteration N?) with side-by-side numbers; (c) the mechanism, citing the
-      ROOT Minuit2 file:line whose behavior we miss. Useful probes:
-      scripts/nist_hard_baseline.py (env: `. .venv-maturin/bin/activate`),
-      iminuit's per-iteration state via callbacks/prints, and our own trace
-      hooks (see scripts/diff_iteration_traces.py).
-- [ ] AC2 FIX (only if AC1 yields a ROOT-citable gap): implement the parity
-      fix in src/ with the ROOT file:line in comments; add a regression test
-      that FAILS pre-change (state the command proving it). Success target:
-      Hahn1 minuit2-rs reaches certified params from NIST Start 1 or 2 at the
-      baseline's 1e-2 tolerance — or, if it still cannot, prove iminuit's
-      success depends on behavior we correctly lack and STOP (that is AC1
-      output, not a failure).
-- [ ] AC3 NO REGRESSIONS: differential harness pass=12 warn=0 fail=0;
-      plain NIST tier 9 passed; hard tier (--ignored) still certifies;
-      regenerate reports/parity/nist_hard_baseline.md if any status changed.
-- [ ] AC4 GATES: `bash .sc/minuit2-rs-j2j.gate.sh` exit 0;
-      `cargo test --all-features` 0 failures; clippy --all-targets clean.
+## 2. Acceptance Criteria (this round)
+- [ ] F1 Hesse runs on the strategy condition, not only on nominal
+      convergence: ROOT enters the Hesse block after each inner pass whenever
+      `strategy>=2 || (strategy==1 && dcovar>0.05)` — even when the pass
+      exited above tolerance (VariableMetricBuilder.cxx:130-160). Currently
+      `if !must_continue && should_hesse(last)` skips Hesse for
+      above-tolerance exits.
+- [ ] F2 Hesse-verified state is ALWAYS appended (ROOT AddResult before the
+      validity/EDM tests, cxx:134-145) so the returned FunctionMinimum carries
+      the Hesse covariance/EDM, not the pre-Hesse one — including when
+      verification succeeds and no continuation happens. Add a test: for a
+      strategy-2 (or dcovar>0.05 strategy-1) fit, the returned covariance
+      matches an explicit MnHesse run on the same point.
+- [ ] F3 Invalid Hesse result exits the loop (ROOT breaks on
+      `!st.IsValid()`, cxx:144-149, where IsValid includes Error().IsValid(),
+      MinimumState.h:67-75). Use the Hesse result/error validity flags — our
+      MinimumState::is_valid() is parameters-only, so the current guard can
+      continue from a broken error matrix.
+- [ ] F4 Hesse verification uses the ORIGINAL maxfcn; only the continuation
+      pass gets the 1.3x budget (cxx:138-140, 177-180).
+- [ ] F5 Negative/NaN EDM guard right after the EDM estimate in the inner
+      loop: ROOT checks isnan(edm) and edm<0, runs MnPosDef and re-estimates,
+      aborts if still negative (cxx:301-322). Needed now that negative-delgam
+      Davidon updates are applied.
+- [ ] Regression hold: tests/hahn1_core_parity.rs still passes; differential
+      harness pass=12 warn=0 fail=0; NIST plain 9 passed + hard tier passes;
+      nist_hard_baseline.md regenerated if statuses move (Hahn1 s1 must stay
+      OK); `bash .sc/minuit2-rs-j2j.gate.sh` exit 0; cargo test
+      --all-features 0 failures; clippy --all-targets clean.
 
 ## 3. Verification
-`bash .sc/minuit2-rs-j2j.gate.sh`  (tests, clippy, differential harness,
-maturin rebuild + baseline rerun, NIST plain+hard tiers)
+`bash .sc/minuit2-rs-j2j.gate.sh`
 
 ## 4. Scope
-✅ ALWAYS: reports/parity/, tests/, scripts/ probe additions,
-   src/ ONLY for a fix whose mechanism cites ROOT Minuit2 source
-⚠️ ASK FIRST: changing any convergence/tolerance constant without a ROOT
-   citation; touching verification/workloads/*.json (waivers); python/minuit2
-   binding semantics
-🚫 NEVER: weakening existing tests or tolerances; "fixing" Hahn1 by special-
-   casing the dataset or seeding from certified values
+✅ ALWAYS: src/migrad/builder.rs, src/minimum/ (validity flags if F3 needs
+   them), src/hesse/ (result flags read-only wiring), tests/, reports/parity/
+⚠️ ASK FIRST: changing MinimumState::is_valid() semantics globally (other
+   call sites depend on it — prefer a local error-validity check in builder)
+🚫 NEVER: weakening tests/tolerances; dataset special-casing; reverting the
+   landed Hahn1 mechanisms
 
 ## 5. Context Pointers
-- `br show minuit2-rs-j2j`; reports/parity/nist_hard_baseline.md (current rows)
-- Prior parity work: k5h = seed NegativeG2LineSearch (did NOT move Hahn1),
-  9ma = Numerical2PGradientCalculator parity. Suspect remaining areas: MnPosDef
-  in-iteration handling, line search (MnLineSearch.cxx), error updator details,
-  MnFcn call accounting — nfcn=72 for 7 params suggests early bailout.
-- Hahn1: 7-param rational poly, x in [60, 1000] — severe scaling; certified
-  fval=1.53244. Datasets parsed by python/compat/nist_models.py.
+- Review findings (verbatim ROOT citations): .sc/minuit2-rs-j2j.review.out
+  is large — the 5 findings are restated fully above; trust the cited lines,
+  read them in third_party/root_ref.
+- reports/parity/hahn1_core_divergence.md — update it if the fixes change
+  the documented mechanism/numbers.
 - Skills: rust.
 
 ## 6. Stop Conditions
-- DONE when AC1 + AC3 + AC4 pass, and AC2 either lands or is justified out.
-- STOP and report if: the mechanism is found but the fix touches an ask-first
-  item; no ROOT-citable mechanism after the trace comparison (report the
-  side-by-side trace as the finding); a gate fails twice on the same cause.
+- DONE when F1–F5 + regression hold all pass.
+- STOP and report if: fixing an edge breaks Hahn1 s1 certification or any
+  differential workload (report which F and the numbers); F3 requires the
+  global is_valid() change (ask-first); a gate fails twice on the same cause.
