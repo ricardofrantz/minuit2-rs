@@ -1,5 +1,3 @@
-# minuit2-rs
-
 ![minuit2-rs banner](assets/readme-banner-v2.png)
 
 [![Crates.io](https://img.shields.io/crates/v/minuit2.svg)](https://crates.io/crates/minuit2)
